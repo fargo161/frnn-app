@@ -287,6 +287,11 @@ function setQuickStartHeaders(res) {
   });
 }
 
+async function quickStartHasPlayerName(client, code) {
+  const profile = await client.query('SELECT display_name FROM player_profiles WHERE code=$1', [code]);
+  return Boolean(profile.rows[0]?.display_name?.trim());
+}
+
 app.get(QUICK_START_ROUTE, async (req, res, next) => {
   setQuickStartHeaders(res);
   if (isPrefetchRequest(req.headers)) {
@@ -297,7 +302,10 @@ app.get(QUICK_START_ROUTE, async (req, res, next) => {
     const existingCode = normalizeAccessCode(parseCookies(req)[COOKIE_NAME]);
     if (existingCode) {
       const existingPlayer = await playerRecord(existingCode);
-      if (existingPlayer?.active) return res.redirect(302, START_END_ROUTE);
+      if (existingPlayer?.active) {
+        if (await quickStartHasPlayerName(pool, existingCode)) return res.redirect(302, START_END_ROUTE);
+        return res.sendFile(path.join(__dirname, 'public', 'quick-start.html'));
+      }
       clearPlayerCookie(res);
     }
 
@@ -313,7 +321,10 @@ app.post('/api/quick-start', async (req, res, next) => {
     const existingCode = normalizeAccessCode(parseCookies(req)[COOKIE_NAME]);
     if (existingCode) {
       const existingPlayer = await playerRecord(existingCode);
-      if (existingPlayer?.active) return res.json({ redirect: START_END_ROUTE, reused: true });
+      if (existingPlayer?.active) {
+        const hasName = await quickStartHasPlayerName(pool, existingCode);
+        return res.json({ redirect: START_END_ROUTE, reused: true, needsName: !hasName });
+      }
       clearPlayerCookie(res);
     }
 
@@ -329,12 +340,42 @@ app.post('/api/quick-start', async (req, res, next) => {
           sourceRoute: QUICK_START_ROUTE
         });
       }
-      return result;
+      return { ...result, hasName: await quickStartHasPlayerName(client, result.code) };
     });
 
     if (!claim) return res.status(503).json({ error: QUICK_START_UNAVAILABLE });
     setPlayerCookie(res, claim.code);
-    return res.json({ redirect: START_END_ROUTE, reused: claim.reused });
+    return res.json({ redirect: START_END_ROUTE, reused: claim.reused, needsName: !claim.hasName });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/quick-start/name', async (req, res, next) => {
+  setQuickStartHeaders(res);
+  const code = normalizeAccessCode(parseCookies(req)[COOKIE_NAME]);
+  if (!code) return res.status(401).json({ error: 'ACCESS_REQUIRED' });
+  const validated = normalizeFinalPlayerName(req.body?.name);
+  if (validated.error) return res.status(400).json({ error: validated.error });
+
+  try {
+    const result = await withTransaction(async client => {
+      const access = await lockAccessCode(client, code);
+      if (!access || access.status !== 'active') return { error: 'ACCESS_REQUIRED', status: 401 };
+      const saved = await saveFinalPlayerName(client, code, validated.name, 'PLAYER');
+      await audit(client, 'PLAYER_QUICK_START_NAME_SAVED', code, 'PLAYER', {
+        displayNamePresent: true,
+        previousNamePresent: saved.previousNamePresent,
+        unchanged: saved.unchanged
+      });
+      return saved;
+    });
+
+    if (result.error) {
+      clearPlayerCookie(res);
+      return res.status(result.status).json({ error: result.error });
+    }
+    return res.json({ ok: true, redirect: START_END_ROUTE, displayName: result.profile.display_name });
   } catch (error) {
     next(error);
   }

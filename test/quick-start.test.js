@@ -141,16 +141,42 @@ test('fresh Quick Start uses an idempotent transaction, existing identity activa
   assert.match(route, /QUICK_START_ACTIVATED/);
   assert.match(route, /setPlayerCookie\(res, claim\.code\)/);
   assert.match(route, /redirect: START_END_ROUTE/);
+  assert.match(route, /needsName: !claim\.hasName/);
 });
 
-test('active cookie bypasses allocation while stale cookie is cleared and replaced safely', async () => {
+test('active cookie bypasses allocation and checks the canonical profile name', async () => {
   const server = await read('../server.js');
   const route = quickStartSlice(server);
   const reuse = route.indexOf('existingPlayer?.active');
   const allocation = route.indexOf('claimQuickStartCode(client, tokenHash)');
   assert.ok(reuse > 0 && allocation > reuse);
-  assert.match(route, /existingPlayer\?\.active.*redirect\(302, START_END_ROUTE\)/s);
+  assert.match(route, /quickStartHasPlayerName\(pool, existingCode\)/);
+  assert.match(route, /needsName: !hasName/);
   assert.match(route, /clearPlayerCookie\(res\)/);
+});
+
+test('existing named players skip capture while nameless active players keep the Quick Start page', async () => {
+  const server = await read('../server.js');
+  const route = quickStartSlice(server);
+  assert.match(route, /if \(await quickStartHasPlayerName\(pool, existingCode\)\) return res\.redirect\(302, START_END_ROUTE\)/);
+  assert.match(route, /return res\.sendFile\(path\.join\(__dirname, 'public', 'quick-start\.html'\)\)/);
+  assert.match(server, /SELECT display_name FROM player_profiles WHERE code=\$1/);
+});
+
+test('Quick Start name endpoint uses only the player cookie and existing profile-name infrastructure', async () => {
+  const server = await read('../server.js');
+  const route = quickStartSlice(server);
+  const start = route.indexOf("app.post('/api/quick-start/name'");
+  const endpoint = route.slice(start);
+  assert.ok(start > 0);
+  assert.match(endpoint, /parseCookies\(req\)\[COOKIE_NAME\]/);
+  assert.doesNotMatch(endpoint, /req\.body\?\.accessCode|codeFromRequest/);
+  assert.match(endpoint, /normalizeFinalPlayerName\(req\.body\?\.name\)/);
+  assert.match(endpoint, /lockAccessCode\(client, code\)/);
+  assert.match(endpoint, /access\.status !== 'active'/);
+  assert.match(endpoint, /saveFinalPlayerName\(client, code, validated\.name, 'PLAYER'\)/);
+  assert.match(endpoint, /redirect: START_END_ROUTE/);
+  assert.doesNotMatch(endpoint, /final_reflections|FINAL_COMPLETION_REQUIRED/);
 });
 
 test('unavailable inventory returns controlled 503 without database detail', async () => {
@@ -184,8 +210,34 @@ test('browser bootstrap shares one token across tabs and POSTs it without a play
   assert.match(html, /localStorage/);
   assert.match(html, /fetch\('\/api\/quick-start'/);
   assert.match(html, /JSON\.stringify\(\{ token \}\)/);
-  assert.match(html, /window\.location\.replace\(data\.redirect\)/);
+  assert.match(html, /if \(data\.needsName\)/);
   assert.doesNotMatch(html, /accessCode/);
+});
+
+test('Quick Start page captures a bounded name and continues after a successful save', async () => {
+  const html = await read('../public/quick-start.html');
+  assert.match(html, /WHAT SHOULD WE CALL YOU\?/);
+  assert.match(html, /YOUR NAME \/ NICKNAME/);
+  assert.match(html, /ENTER THE NETWORK/);
+  assert.match(html, /autocomplete="name" maxlength="80"/);
+  assert.match(html, /nameForm\.addEventListener\('submit'/);
+  assert.match(html, /playerName\.value\.trim\(\)/);
+  assert.match(html, /if \(!name\)/);
+  assert.match(html, /nameButton\.disabled = true/);
+  assert.match(html, /fetch\('\/api\/quick-start\/name'/);
+  assert.match(html, /JSON\.stringify\(\{ name \}\)/);
+  assert.match(html, /window\.location\.replace\(data\.redirect\)/);
+  assert.match(html, /nameButton\.disabled = false/);
+});
+
+test('Quick Start name save preserves profile contact and notes through the canonical helper', async () => {
+  const profiles = await read('../player-profiles.js');
+  const start = profiles.indexOf('export async function saveFinalPlayerName');
+  const end = profiles.indexOf('export async function deletePlayerProfile', start);
+  const helper = profiles.slice(start, end);
+  assert.match(helper, /contactInfo: profile\?\.contact_info \|\| ''/);
+  assert.match(helper, /notes: profile\?\.notes \|\| ''/);
+  assert.match(helper, /savePlayerProfileWithHistory/);
 });
 
 test('schema persists idempotency claims and player resets release their mappings', async () => {

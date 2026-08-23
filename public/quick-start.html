@@ -9,17 +9,33 @@
   <style>
     main{max-width:36rem;margin:12vh auto;padding:2rem;text-align:center}
     .signal{letter-spacing:.12em;text-transform:uppercase}
+    #nameCapture{text-align:left;margin-top:2rem}
+    #nameCapture h2{text-align:center}
   </style>
 </head>
 <body>
   <main>
     <h1>QUICK START</h1>
     <p id="status" class="signal" role="status">ESTABLISHING PLAYER SIGNAL…</p>
+    <section id="nameCapture" class="card hidden">
+      <h2>WHAT SHOULD WE CALL YOU?</h2>
+      <form id="nameForm">
+        <label for="playerName">YOUR NAME / NICKNAME</label>
+        <input id="playerName" name="name" autocomplete="name" maxlength="80">
+        <div class="toolbar"><button id="nameButton" type="submit">ENTER THE NETWORK</button></div>
+      </form>
+      <p id="nameError" class="meta error" role="alert"></p>
+    </section>
   </main>
   <script>
     (() => {
       const storageKey = 'artpark_quick_start_idempotency';
       const status = document.getElementById('status');
+      const nameCapture = document.getElementById('nameCapture');
+      const nameForm = document.getElementById('nameForm');
+      const playerName = document.getElementById('playerName');
+      const nameButton = document.getElementById('nameButton');
+      const nameError = document.getElementById('nameError');
       const makeToken = () => crypto.randomUUID?.() || `${Date.now()}_${crypto.getRandomValues(new Uint32Array(4)).join('_')}`;
       const storedToken = () => {
         try { return localStorage.getItem(storageKey) || ''; } catch { return ''; }
@@ -48,9 +64,40 @@
       })).then(async response => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || 'QUICK START TEMPORARILY UNAVAILABLE // REPORT TO CONCIERGE');
+        if (data.needsName) {
+          status.textContent = 'PLAYER SIGNAL ESTABLISHED';
+          nameCapture.classList.remove('hidden');
+          playerName.focus();
+          return;
+        }
         window.location.replace(data.redirect);
       }).catch(error => {
         status.textContent = error.message;
+      });
+
+      nameForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const name = playerName.value.trim();
+        nameError.textContent = '';
+        if (!name) {
+          nameError.textContent = 'ENTER YOUR NAME OR NICKNAME.';
+          return;
+        }
+        nameButton.disabled = true;
+        try {
+          const response = await fetch('/api/quick-start/name', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || 'NAME SAVE TEMPORARILY UNAVAILABLE');
+          window.location.replace(data.redirect);
+        } catch (error) {
+          nameError.textContent = `${error.message}. PLEASE TRY AGAIN.`;
+          nameButton.disabled = false;
+        }
       });
     })();
   </script>
