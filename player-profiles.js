@@ -1,5 +1,17 @@
 export const PROFILE_LIMITS = Object.freeze({ displayName: 80, contactInfo: 200, notes: 1000 });
 
+export function normalizeDisplayName(value) {
+  return String(value || '').trim().replace(/\s+/gu, ' ');
+}
+
+export function normalizedDisplayNameKey(value) {
+  return normalizeDisplayName(value).toLocaleLowerCase('en-US');
+}
+
+export function isDisplayNameConflict(error) {
+  return error?.code === '23505' && error?.constraint === 'player_profiles_event_display_name_unique';
+}
+
 export function normalizeProfileInput(body = {}) {
   const values = {};
   for (const [key, limit] of Object.entries(PROFILE_LIMITS)) {
@@ -7,6 +19,7 @@ export function normalizeProfileInput(body = {}) {
     values[key] = String(body[key] || '').trim();
     if (values[key].length > limit) return null;
   }
+  values.displayName = normalizeDisplayName(values.displayName);
   return values;
 }
 
@@ -16,7 +29,7 @@ export function normalizeProfileSearch(value) {
 
 export function normalizeFinalPlayerName(value) {
   if (typeof value !== 'string') return { error: 'NAME_REQUIRED' };
-  const name = value.trim();
+  const name = normalizeDisplayName(value);
   if (!name) return { error: 'NAME_REQUIRED' };
   if (name.length > PROFILE_LIMITS.displayName) return { error: 'NAME_TOO_LONG' };
   return { name };

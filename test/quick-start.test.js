@@ -140,7 +140,7 @@ test('fresh Quick Start uses an idempotent transaction, existing identity activa
   assert.match(route, /ensurePlayerIdentity\(client, result\.code\)/);
   assert.match(route, /QUICK_START_ACTIVATED/);
   assert.match(route, /setPlayerCookie\(res, claim\.code\)/);
-  assert.match(route, /redirect: START_END_ROUTE/);
+  assert.match(route, /redirect: PLAYER_SHELL_ROUTE/);
   assert.match(route, /needsName: !claim\.hasName/);
 });
 
@@ -158,7 +158,7 @@ test('active cookie bypasses allocation and checks the canonical profile name', 
 test('existing named players skip capture while nameless active players keep the Quick Start page', async () => {
   const server = await read('../server.js');
   const route = quickStartSlice(server);
-  assert.match(route, /if \(await quickStartHasPlayerName\(pool, existingCode\)\) return res\.redirect\(302, START_END_ROUTE\)/);
+  assert.match(route, /if \(await quickStartHasPlayerName\(pool, existingCode\)\) return res\.redirect\(302, PLAYER_SHELL_ROUTE\)/);
   assert.match(route, /return res\.sendFile\(path\.join\(__dirname, 'public', 'quick-start\.html'\)\)/);
   assert.match(server, /SELECT display_name FROM player_profiles WHERE code=\$1/);
 });
@@ -175,7 +175,7 @@ test('Quick Start name endpoint uses only the player cookie and existing profile
   assert.match(endpoint, /lockAccessCode\(client, code\)/);
   assert.match(endpoint, /access\.status !== 'active'/);
   assert.match(endpoint, /saveFinalPlayerName\(client, code, validated\.name, 'PLAYER'\)/);
-  assert.match(endpoint, /redirect: START_END_ROUTE/);
+  assert.match(endpoint, /redirect: PLAYER_SHELL_ROUTE/);
   assert.doesNotMatch(endpoint, /final_reflections|FINAL_COMPLETION_REQUIRED/);
 });
 

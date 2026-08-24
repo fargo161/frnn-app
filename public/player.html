@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050408">
+  <title>Festival Network</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    :root{--shell-bg:var(--bg);--shell-panel:var(--panel);--shell-ink:var(--ink);--shell-accent:var(--magenta);--shell-secondary:var(--cyan);--shell-highlight:var(--acid);--shell-muted:var(--muted)}
+    html,body{background:var(--shell-bg);color:var(--shell-ink)}body{margin:0}.shell{width:min(100%,540px);min-height:100dvh;margin:auto;padding:max(18px,env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:18px;background:radial-gradient(circle at 50% 0,color-mix(in srgb,var(--shell-accent) 18%,transparent),transparent 36%),var(--shell-bg)}
+    .shell-header{display:flex;align-items:center;gap:13px}.network-mark{width:50px;height:50px;flex:0 0 50px;border:1px solid var(--shell-accent);border-radius:15px;display:grid;place-items:center;color:var(--shell-highlight);font-size:1.55rem;box-shadow:0 0 24px color-mix(in srgb,var(--shell-accent) 35%,transparent);background:var(--shell-panel)}
+    .identity{min-width:0}.identity strong,.identity span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.identity strong{font-size:.82rem;letter-spacing:.12em}.identity span{margin-top:3px;color:var(--shell-muted);font-size:.67rem;letter-spacing:.1em}.program{color:var(--shell-secondary)!important}
+    .screen{display:none;animation:signal-in .18s ease}.screen.active{display:block}.screen-card{min-height:52dvh;padding:24px 20px;border:1px solid color-mix(in srgb,var(--shell-accent) 48%,transparent);border-radius:24px;background:linear-gradient(180deg,color-mix(in srgb,var(--shell-panel) 94%,white 2%),var(--shell-panel));box-shadow:0 18px 52px #0008}.eyebrow{color:var(--shell-secondary);font-size:.7rem;letter-spacing:.18em}.screen h1{font-size:clamp(2.1rem,11vw,4rem);line-height:.95}.coming-online{margin-top:28px;padding:18px;border:1px solid color-mix(in srgb,var(--shell-highlight) 45%,transparent);color:var(--shell-highlight);letter-spacing:.11em;line-height:1.55}.avatar{width:90px;height:90px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--shell-secondary);color:var(--shell-secondary);font-size:2.1rem;background:#0004}.recovery{margin-top:18px;padding:19px;border:1px solid var(--shell-highlight);border-radius:15px}.recovery code{display:block;margin-top:8px;color:var(--shell-highlight);font-size:clamp(1.8rem,10vw,3rem);letter-spacing:.12em}.progress-bar{height:10px;margin:10px 0;border-radius:10px;background:#302638;overflow:hidden}.progress-bar span{display:block;height:100%;width:0;background:var(--shell-highlight)}
+    .bottom-nav{position:fixed;z-index:5;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,540px);display:grid;grid-template-columns:repeat(4,1fr);padding:10px 8px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #49354f;background:color-mix(in srgb,var(--shell-panel) 94%,transparent);backdrop-filter:blur(16px)}.nav-button{min-height:58px;padding:7px 3px;border:0;background:transparent;color:var(--shell-muted);font-size:.62rem;letter-spacing:.06em}.nav-button span{display:block;margin-bottom:5px;font-size:1.15rem}.nav-button.active{color:var(--shell-highlight);box-shadow:none}.error-panel{border-color:#ff9797;color:#ffb1b1}.hidden{display:none!important}@keyframes signal-in{from{opacity:.35;transform:translateY(5px)}to{opacity:1;transform:none}}
+    @media (prefers-reduced-motion:reduce){.screen{animation:none}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="shell-header">
+      <div class="network-mark" aria-hidden="true">✦</div>
+      <div class="identity">
+        <strong id="festivalName">FESTIVAL NETWORK</strong>
+        <span id="networkName">CONNECTING</span>
+        <span id="showName" class="program"></span>
+      </div>
+    </header>
+
+    <div id="loading" class="signal" role="status">CONNECTING PLAYER RECEIVER…</div>
+    <div id="shellError" class="signal error-panel hidden" role="alert"></div>
+
+    <section id="news" class="screen active" aria-labelledby="newsTitle">
+      <div class="screen-card"><div class="eyebrow" id="newsNetwork">NETWORK FEED</div><h1 id="newsTitle">NEWS</h1><p id="newsShow" class="meta"></p><div class="coming-online">NEWS FEED COMING ONLINE</div></div>
+    </section>
+    <section id="upload" class="screen" aria-labelledby="uploadTitle">
+      <div class="screen-card"><div class="eyebrow">FIELD CHANNEL</div><h1 id="uploadTitle">UPLOAD</h1><div class="coming-online">FIELD REPORTING COMING ONLINE</div></div>
+    </section>
+    <section id="info" class="screen" aria-labelledby="infoTitle">
+      <div class="screen-card"><div class="eyebrow">AUTHORITATIVE INFORMATION</div><h1 id="infoTitle">WEATHER / INFO</h1><div class="coming-online">OFFICIAL FESTIVAL INFORMATION WILL APPEAR HERE</div></div>
+    </section>
+    <section id="profile" class="screen" aria-labelledby="profileTitle">
+      <div class="screen-card"><div class="eyebrow">PRIVATE PLAYER PROFILE</div><h1 id="profileTitle">PROFILE</h1><div class="avatar" aria-label="Avatar placeholder">✦</div><h2 id="displayName">PLAYER</h2><div class="tiny">QUEST SIGNALS</div><div class="progress-bar" aria-hidden="true"><span id="progressFill"></span></div><div id="questProgress" class="meta">0 / 4 COMPLETE</div><div class="recovery"><div class="tiny">PRIVATE RECOVERY CODE</div><code id="accessCode">———-———</code><p class="meta">Keep this code private. Use it to restore your player identity on another device.</p></div><p><a class="button" href="/s/start-end">OPEN START / END</a></p></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Player navigation">
+    <button class="nav-button active" data-screen="news" type="button"><span aria-hidden="true">◉</span>NEWS</button>
+    <button class="nav-button" data-screen="upload" type="button"><span aria-hidden="true">⇧</span>UPLOAD</button>
+    <button class="nav-button" data-screen="info" type="button"><span aria-hidden="true">☼</span>WEATHER / INFO</button>
+    <button class="nav-button" data-screen="profile" type="button"><span aria-hidden="true">◇</span>PROFILE</button>
+  </nav>
+
+  <script>
+    const byId=id=>document.getElementById(id);
+    const themeVariables={background:'--shell-bg',panel:'--shell-panel',ink:'--shell-ink',accent:'--shell-accent',secondary:'--shell-secondary',highlight:'--shell-highlight',muted:'--shell-muted'};
+    function applyEvent(event){document.title=event.festivalName;byId('festivalName').textContent=event.festivalName;byId('networkName').textContent=event.networkName;byId('showName').textContent=event.showName;byId('newsNetwork').textContent=event.networkName;byId('newsShow').textContent=`${event.showName} // PROGRAM CHANNEL`;for(const [key,variable] of Object.entries(themeVariables)){if(event.theme?.[key])document.documentElement.style.setProperty(variable,event.theme[key])}}
+    function applyProfile(profile){byId('displayName').textContent=profile.displayName||'UNNAMED PLAYER';byId('accessCode').textContent=profile.accessCode;const completed=Number(profile.quest?.completed||0);const total=Number(profile.quest?.total||4);byId('questProgress').textContent=`${completed} / ${total} SIGNALS IDENTIFIED${profile.quest?.finalComplete?' // FINAL COMPLETE':''}`;byId('progressFill').style.width=`${Math.min(100,(completed/Math.max(1,total))*100)}%`}
+    function selectScreen(name){for(const section of document.querySelectorAll('.screen'))section.classList.toggle('active',section.id===name);for(const button of document.querySelectorAll('.nav-button')){const active=button.dataset.screen===name;button.classList.toggle('active',active);button.setAttribute('aria-current',active?'page':'false')}}
+    for(const button of document.querySelectorAll('.nav-button'))button.addEventListener('click',()=>selectScreen(button.dataset.screen));
+    Promise.all([fetch('/api/event',{cache:'no-store'}),fetch('/api/player-profile',{cache:'no-store',credentials:'same-origin'})]).then(async([eventResponse,profileResponse])=>{if(profileResponse.status===401){window.location.replace('/quick-start');return}const eventData=await eventResponse.json();const profileData=await profileResponse.json();if(!eventResponse.ok||!profileResponse.ok)throw new Error('PLAYER NETWORK TEMPORARILY UNAVAILABLE');applyEvent(eventData.event);applyProfile(profileData.profile);byId('loading').classList.add('hidden')}).catch(error=>{byId('loading').classList.add('hidden');byId('shellError').textContent=error.message;byId('shellError').classList.remove('hidden')});
+  </script>
+</body>
+</html>

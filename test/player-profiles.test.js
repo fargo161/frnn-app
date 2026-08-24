@@ -132,12 +132,15 @@ test('Drawing Pool CSV adds display name and excludes contact, notes, and final 
   assert.match(server, /access_code,display_name,final_completed_at,previous_winner/);
 });
 
-test('profile data remains operator-only and cache behavior is unchanged', async () => {
+test('private profile data remains operator-only while the owner projection stays narrow and uncached', async () => {
   const [server, station] = await Promise.all([read('../server.js'), read('../public/station.html')]);
   const publicStart = server.indexOf("app.get('/api/me'");
   const publicEnd = server.indexOf("app.get('/api/admin/summary'", publicStart);
-  const meEnd = server.indexOf("app.post('/api/access'", publicStart);
-  assert.doesNotMatch(server.slice(publicStart, meEnd), /player_profiles|display_name|contact_info|notes/);
+  const ownerStart = server.indexOf("app.get('/api/player-profile'", publicStart);
+  const ownerEnd = server.indexOf("app.post('/api/access'", ownerStart);
+  assert.doesNotMatch(server.slice(publicStart, ownerStart), /player_profiles|display_name|contact_info|notes/);
+  assert.match(server.slice(ownerStart, ownerEnd), /SELECT display_name FROM player_profiles/);
+  assert.match(server.slice(ownerStart, ownerEnd), /no-store, private/);
   assert.doesNotMatch(server.slice(publicStart, publicEnd), /contact_info|notes|player_profile_versions/);
   assert.doesNotMatch(station, /contactInfo|contact_info|profileNotes|player_profile_versions/);
   assert.match(station, /fetch\('\/api\/final-name'/);

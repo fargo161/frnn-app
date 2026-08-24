@@ -32,6 +32,7 @@ import {
   normalizeProfileInput,
   normalizeProfileSearch,
   normalizeFinalPlayerName,
+  isDisplayNameConflict,
   publicProfile,
   publicProfileVersion,
   lockProfileAccessCode,
@@ -40,6 +41,8 @@ import {
   deletePlayerProfile,
   restorePlayerProfileVersion
 } from './player-profiles.js';
+import { getDefaultEvent } from './events.js';
+import { PLAYER_SHELL_ROUTE, ownerProfileView } from './player-shell.js';
 import {
   DRAWING_POOL_ELIGIBLE_SQL,
   DRAWING_POOL_HISTORY_SQL,
@@ -303,7 +306,7 @@ app.get(QUICK_START_ROUTE, async (req, res, next) => {
     if (existingCode) {
       const existingPlayer = await playerRecord(existingCode);
       if (existingPlayer?.active) {
-        if (await quickStartHasPlayerName(pool, existingCode)) return res.redirect(302, START_END_ROUTE);
+        if (await quickStartHasPlayerName(pool, existingCode)) return res.redirect(302, PLAYER_SHELL_ROUTE);
         return res.sendFile(path.join(__dirname, 'public', 'quick-start.html'));
       }
       clearPlayerCookie(res);
@@ -323,7 +326,7 @@ app.post('/api/quick-start', async (req, res, next) => {
       const existingPlayer = await playerRecord(existingCode);
       if (existingPlayer?.active) {
         const hasName = await quickStartHasPlayerName(pool, existingCode);
-        return res.json({ redirect: START_END_ROUTE, reused: true, needsName: !hasName });
+        return res.json({ redirect: PLAYER_SHELL_ROUTE, reused: true, needsName: !hasName });
       }
       clearPlayerCookie(res);
     }
@@ -345,7 +348,7 @@ app.post('/api/quick-start', async (req, res, next) => {
 
     if (!claim) return res.status(503).json({ error: QUICK_START_UNAVAILABLE });
     setPlayerCookie(res, claim.code);
-    return res.json({ redirect: START_END_ROUTE, reused: claim.reused, needsName: !claim.hasName });
+    return res.json({ redirect: PLAYER_SHELL_ROUTE, reused: claim.reused, needsName: !claim.hasName });
   } catch (error) {
     next(error);
   }
@@ -375,8 +378,14 @@ app.post('/api/quick-start/name', async (req, res, next) => {
       clearPlayerCookie(res);
       return res.status(result.status).json({ error: result.error });
     }
-    return res.json({ ok: true, redirect: START_END_ROUTE, displayName: result.profile.display_name });
+    return res.json({ ok: true, redirect: PLAYER_SHELL_ROUTE, displayName: result.profile.display_name });
   } catch (error) {
+    if (isDisplayNameConflict(error)) {
+      return res.status(409).json({
+        error: 'DISPLAY_NAME_TAKEN',
+        message: 'THAT NAME IS ALREADY ON THE NETWORK. Add something to make yours unique.'
+      });
+    }
     next(error);
   }
 });
@@ -395,6 +404,16 @@ app.get('/api/config', async (_req, res) => {
   res.json(safeConfigForPlayer(config));
 });
 
+app.get('/api/event', async (_req, res, next) => {
+  try {
+    const event = await getDefaultEvent(pool);
+    if (!event) return res.status(503).json({ error: 'EVENT_NOT_CONFIGURED' });
+    res.json({ event });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/me', async (req, res) => {
   const code = normalizeAccessCode(parseCookies(req)[COOKIE_NAME]);
   if (!code) return res.status(401).json({ error: 'ACCESS_REQUIRED' });
@@ -404,6 +423,23 @@ app.get('/api/me', async (req, res) => {
     return res.status(401).json({ error: 'ACCESS_REQUIRED' });
   }
   res.json({ player });
+});
+
+app.get('/api/player-profile', async (req, res, next) => {
+  res.set('Cache-Control', 'no-store, private');
+  const code = normalizeAccessCode(parseCookies(req)[COOKIE_NAME]);
+  if (!code) return res.status(401).json({ error: 'ACCESS_REQUIRED' });
+  try {
+    const player = await playerRecord(code);
+    if (!player?.active) {
+      clearPlayerCookie(res);
+      return res.status(401).json({ error: 'ACCESS_REQUIRED' });
+    }
+    const profile = await pool.query('SELECT display_name FROM player_profiles WHERE code=$1', [code]);
+    res.json({ profile: ownerProfileView({ profile: profile.rows[0], player }) });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post('/api/access', async (req, res) => {
@@ -628,36 +664,43 @@ app.post('/api/final-reflection', async (req, res) => {
   res.json(result);
 });
 
-app.post('/api/final-name', async (req, res) => {
+app.post('/api/final-name', async (req, res, next) => {
   const code = normalizeAccessCode(parseCookies(req)[COOKIE_NAME]);
   if (!code) return res.status(401).json({ error: 'ACCESS_REQUIRED' });
   const validated = normalizeFinalPlayerName(req.body?.name);
   if (validated.error) return res.status(400).json({ error: validated.error });
 
-  const result = await withTransaction(async client => {
-    const access = await lockAccessCode(client, code);
-    if (!access || access.status !== 'active') return { error: 'ACCESS_REQUIRED', status: 401 };
-    const completion = await client.query('SELECT code FROM final_reflections WHERE code=$1', [code]);
-    if (!completion.rows[0]) return { error: 'FINAL_COMPLETION_REQUIRED', status: 409 };
-    const saved = await saveFinalPlayerName(client, code, validated.name, 'PLAYER');
-    await audit(client, 'PLAYER_FINAL_NAME_SAVED', code, 'PLAYER', {
-      displayNamePresent: true,
-      previousNamePresent: saved.previousNamePresent,
-      unchanged: saved.unchanged
+  try {
+    const result = await withTransaction(async client => {
+      const access = await lockAccessCode(client, code);
+      if (!access || access.status !== 'active') return { error: 'ACCESS_REQUIRED', status: 401 };
+      const completion = await client.query('SELECT code FROM final_reflections WHERE code=$1', [code]);
+      if (!completion.rows[0]) return { error: 'FINAL_COMPLETION_REQUIRED', status: 409 };
+      const saved = await saveFinalPlayerName(client, code, validated.name, 'PLAYER');
+      await audit(client, 'PLAYER_FINAL_NAME_SAVED', code, 'PLAYER', {
+        displayNamePresent: true,
+        previousNamePresent: saved.previousNamePresent,
+        unchanged: saved.unchanged
+      });
+      return saved;
     });
-    return saved;
-  });
 
-  if (result.error) {
-    if (result.status === 401) clearPlayerCookie(res);
-    return res.status(result.status).json({ error: result.error });
+    if (result.error) {
+      if (result.status === 401) clearPlayerCookie(res);
+      return res.status(result.status).json({ error: result.error });
+    }
+    res.json({
+      ok: true,
+      accessCode: formatAccessCode(code),
+      displayName: result.profile.display_name,
+      unchanged: result.unchanged
+    });
+  } catch (error) {
+    if (isDisplayNameConflict(error)) {
+      return res.status(409).json({ error: 'DISPLAY_NAME_TAKEN' });
+    }
+    next(error);
   }
-  res.json({
-    ok: true,
-    accessCode: formatAccessCode(code),
-    displayName: result.profile.display_name,
-    unchanged: result.unchanged
-  });
 });
 
 app.post('/api/start-end', async (req, res) => {
@@ -702,6 +745,10 @@ app.get(STATION_ROUTES, (_req, res) => {
 
 app.get(START_END_ROUTE, (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'station.html'));
+});
+
+app.get(PLAYER_SHELL_ROUTE, (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'player.html'));
 });
 
 app.get('/admin', (_req, res) => {
@@ -950,26 +997,31 @@ app.get('/api/admin/player-profile/:code/history', requireAdmin, async (req, res
   });
 });
 
-app.post('/api/admin/player-profile/:code/restore/:versionId', requireAdmin, async (req, res) => {
+app.post('/api/admin/player-profile/:code/restore/:versionId', requireAdmin, async (req, res, next) => {
   const code = normalizeAccessCode(req.params.code);
   const versionId = /^\d+$/.test(req.params.versionId) ? Number(req.params.versionId) : 0;
   if (!code || !Number.isSafeInteger(versionId) || versionId < 1) {
     return res.status(400).json({ error: 'INVALID_PROFILE_VERSION' });
   }
-  const result = await withTransaction(async client => {
-    if (!await lockProfileAccessCode(client, code)) return { error: 'PLAYER_NOT_FOUND' };
-    const restored = await restorePlayerProfileVersion(client, code, versionId, req.missionOperator);
-    if (!restored) return { error: 'PROFILE_VERSION_NOT_FOUND' };
-    await audit(client, 'PLAYER_PROFILE_RESTORED', code, req.missionOperator, {
-      versionId,
-      currentProfileExisted: restored.currentProfileExisted,
-      displayNamePresent: Boolean(restored.restored.display_name)
+  try {
+    const result = await withTransaction(async client => {
+      if (!await lockProfileAccessCode(client, code)) return { error: 'PLAYER_NOT_FOUND' };
+      const restored = await restorePlayerProfileVersion(client, code, versionId, req.missionOperator);
+      if (!restored) return { error: 'PROFILE_VERSION_NOT_FOUND' };
+      await audit(client, 'PLAYER_PROFILE_RESTORED', code, req.missionOperator, {
+        versionId,
+        currentProfileExisted: restored.currentProfileExisted,
+        displayNamePresent: Boolean(restored.restored.display_name)
+      });
+      return restored;
     });
-    return restored;
-  });
-  if (result.error === 'PLAYER_NOT_FOUND') return res.status(404).json({ error: result.error });
-  if (result.error) return res.status(404).json({ error: result.error });
-  res.json({ accessCode: formatAccessCode(code), profile: publicProfile(result.restored) });
+    if (result.error === 'PLAYER_NOT_FOUND') return res.status(404).json({ error: result.error });
+    if (result.error) return res.status(404).json({ error: result.error });
+    res.json({ accessCode: formatAccessCode(code), profile: publicProfile(result.restored) });
+  } catch (error) {
+    if (isDisplayNameConflict(error)) return res.status(409).json({ error: 'DISPLAY_NAME_TAKEN' });
+    next(error);
+  }
 });
 
 app.get('/api/admin/player-profile/:code', requireAdmin, async (req, res) => {
@@ -980,18 +1032,23 @@ app.get('/api/admin/player-profile/:code', requireAdmin, async (req, res) => {
   res.json({ accessCode: formatAccessCode(code), profile: publicProfile(result.rows[0]) });
 });
 
-app.put('/api/admin/player-profile/:code', requireAdmin, async (req, res) => {
+app.put('/api/admin/player-profile/:code', requireAdmin, async (req, res, next) => {
   const code = normalizeAccessCode(req.params.code);
   const profile = normalizeProfileInput(req.body);
   if (!code || !profile) return res.status(400).json({ error: 'INVALID_PLAYER_PROFILE' });
-  const saved = await withTransaction(async client => {
-    if (!await lockProfileAccessCode(client, code)) return null;
-    const result = await savePlayerProfileWithHistory(client, code, profile, req.missionOperator);
-    await audit(client, 'PLAYER_PROFILE_UPDATED', code, req.missionOperator, { displayName: profile.displayName });
-    return result;
-  });
-  if (!saved) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
-  res.json({ accessCode: formatAccessCode(code), profile: publicProfile(saved) });
+  try {
+    const saved = await withTransaction(async client => {
+      if (!await lockProfileAccessCode(client, code)) return null;
+      const result = await savePlayerProfileWithHistory(client, code, profile, req.missionOperator);
+      await audit(client, 'PLAYER_PROFILE_UPDATED', code, req.missionOperator, { displayName: profile.displayName });
+      return result;
+    });
+    if (!saved) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
+    res.json({ accessCode: formatAccessCode(code), profile: publicProfile(saved) });
+  } catch (error) {
+    if (isDisplayNameConflict(error)) return res.status(409).json({ error: 'DISPLAY_NAME_TAKEN' });
+    next(error);
+  }
 });
 
 app.delete('/api/admin/player-profile/:code', requireAdmin, async (req, res) => {

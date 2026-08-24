@@ -234,7 +234,7 @@ test('Field Record Lookup reports visits, response completion, selected choice, 
   assert.match(html, /VISITED \$\{mission\.visited\?'YES':'NO'\}/);
   assert.match(html, /RESPONSE \$\{mission\.responseComplete\?'COMPLETE':'PENDING'\}/);
   assert.match(html, /SELECTED: \$\{mission\.selectedChoice\}/);
-  assert.match(html, /player\.videoRoundComplete\?'PENDING':'LOCKED'/);
+  assert.match(html, /player\.videoRoundComplete\?'FINAL PENDING':'FINAL LOCKED'/);
 });
 
 test('test codes use the same real station and final endpoints while remaining isolated in metrics', async () => {
@@ -300,8 +300,8 @@ test('Mission Control tracks final-question completions in summary and active re
   assert.match(server, /finalComplete: Number\(finalComplete\.rows\[0\]\.count\)/);
   assert.match(server, /AS final_complete/);
   assert.match(server, /finalComplete: row\.final_complete/);
-  assert.match(admin, /FINAL QUESTION COMPLETE/);
+  assert.match(admin, /WINNERS \/ FINAL COMPLETE/);
   assert.match(admin, /id="finalComplete"/);
   assert.match(admin, /data\.finalComplete\|\|0/);
-  assert.match(admin, /receiver\.finalComplete\?'FINAL QUESTION COMPLETE':'FINAL QUESTION PENDING'/);
+  assert.match(admin, /receiver\.finalComplete\?'WINNER \/\/ FINAL COMPLETE':'FINAL PENDING'/);
 });

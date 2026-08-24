@@ -92,7 +92,7 @@
             body: JSON.stringify({ name })
           });
           const data = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(data.error || 'NAME SAVE TEMPORARILY UNAVAILABLE');
+          if (!response.ok) throw new Error(data.message || data.error || 'NAME SAVE TEMPORARILY UNAVAILABLE');
           window.location.replace(data.redirect);
         } catch (error) {
           nameError.textContent = `${error.message}. PLEASE TRY AGAIN.`;

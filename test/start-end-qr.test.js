@@ -74,7 +74,7 @@ test('Mission Control preserves Start/End and exposes state-based station and fi
   assert.match(html, /START\/END \/\/ END VIDEO/);
   assert.match(html, /LOOP VIDEO/);
   assert.match(html, /COMPLETION VIDEO/);
-  assert.match(html, /FINAL QUESTION \/\/ WRONG ANSWER VIDEO/);
+  assert.match(html, /FINAL QUESTION \/\/ HINT \/ WRONG ANSWER VIDEO/);
   assert.match(html, /FINAL QUESTION \/\/ CORRECT ANSWER VIDEO/);
   assert.match(html, /QR Code Generator/i);
   assert.match(html, /DOWNLOAD PNG/);
