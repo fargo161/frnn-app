@@ -4,7 +4,7 @@
 
 Open `/admin` on any internet-connected phone or laptop and enter the shared team passphrase. Use **ISSUE NEXT FIELD CODE** instead of opening the private credential inventory. A real credential becomes durably owned on first activation and is never issued to another player by normal operations. Select **LOG OUT** when finished.
 
-`RESET GAMEPLAY` clears the digital route, responses, and final reflection while preserving durable identity, recovery continuity, profile/history, and prize history. It does not affect physical stamps. **DELETE PLAYER IDENTITY + RELEASE CREDENTIAL** is a separate destructive operator action requiring typed code confirmation; use it only when permanent deletion and reuse are intended. `TEST-01` through `TEST-05` remain explicitly reusable fixtures and do not change event counts.
+`RESET GAMEPLAY` clears the digital route, responses, and final reflection while preserving durable identity, recovery continuity, profile/history, and prize history. It does not affect physical stamps. **DELETE PLAYER IDENTITY + RELEASE CREDENTIAL** is a separate destructive operator action requiring typed code confirmation; it removes active identity/profile/recovery state and permits reuse, while historical prize and audit records remain attached to the credential. `TEST-01` through `TEST-05` remain explicitly reusable fixtures and do not change event counts.
 
 ## What you need at concierge
 

@@ -96,7 +96,7 @@ It shows:
 - **ACTIVE**: successfully entered and representing a current player/group journey.
 - **COMPLETE**: active with all four unique digital station visits.
 
-Operational lifecycle is **UNUSED → ACTIVE → COMPLETE**, while durable ownership is independently **UNCLAIMED → CLAIMED**. **RESET GAMEPLAY clears the digital route, four reflective choices, final response, and phrase-reveal eligibility but preserves claimed ownership, active recovery continuity, player/profile/history, and prize history.** Only the separately confirmed privileged **DELETE PLAYER IDENTITY + RELEASE CREDENTIAL** action removes identity-owned state and clears ownership. Physical stamps are unaffected.
+Operational lifecycle is **UNUSED → ACTIVE → COMPLETE**, while durable ownership is independently **UNCLAIMED → CLAIMED**. **RESET GAMEPLAY clears the digital route, four reflective choices, final response, and phrase-reveal eligibility but preserves claimed ownership, active recovery continuity, player/profile/history, and prize history.** Only the separately confirmed privileged **DELETE PLAYER IDENTITY + RELEASE CREDENTIAL** action removes active identity/profile/recovery state and clears ownership. Historical prize and audit records remain attached to the credential after release. Physical stamps are unaffected.
 
 Mission Control also provides `TEST-01` through `TEST-05`. Test codes use the real authorization, cookie, routing, recovery, and video behavior, but are excluded from production inventory, activity, station-scan, and completion metrics.
 

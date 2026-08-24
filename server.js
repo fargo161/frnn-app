@@ -1212,13 +1212,7 @@ app.delete('/api/admin/player/:accessCode/identity', requireAdmin, async (req, r
   }
 
   const result = await withTransaction(async client => {
-    const released = await releasePlayerIdentity(client, code);
-    if (released.error) return released;
-    await audit(client, 'PLAYER_IDENTITY_RELEASED', code, req.missionOperator, {
-      destructive: true,
-      credentialReturnedToInventory: true
-    });
-    return released;
+    return releasePlayerIdentity(client, code, req.missionOperator);
   });
   if (result.error) return res.status(result.status).json({ error: result.error });
   res.json({ ok: true, accessCode: formatAccessCode(code), status: 'unused' });

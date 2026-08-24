@@ -28,6 +28,7 @@ class IdentityMemoryClient {
     this.finals = new Map();
     this.claims = new Map();
     this.prizes = new Map();
+    this.audits = [];
   }
 
   accessRow(code) {
@@ -105,10 +106,6 @@ class IdentityMemoryClient {
       for (const [token, code] of this.claims) if (code === values[0]) this.claims.delete(token);
       return { rows: [] };
     }
-    if (statement.startsWith('DELETE FROM prize_draws')) {
-      this.prizes.delete(values[0]);
-      return { rows: [] };
-    }
     if (statement.startsWith('DELETE FROM player_profile_versions')) {
       this.profileVersions.delete(values[0]);
       return { rows: [] };
@@ -130,6 +127,12 @@ class IdentityMemoryClient {
       row.allocated_at = null;
       row.activated_at = null;
       row.claimed_at = null;
+      return { rows: [] };
+    }
+    if (statement.startsWith('INSERT INTO mission_control_audit')) {
+      this.audits.push({
+        action: values[0], code: values[1], operator: values[2], detail: JSON.parse(values[3])
+      });
       return { rows: [] };
     }
     throw new Error(`Unexpected query: ${statement}`);
@@ -183,15 +186,32 @@ test('Player A reset cannot transfer identity, recovery survives, and only expli
   assert.equal(client.access.get('AAA111').claimed_at, originalClaimedAt);
   assert.equal(client.profiles.get('AAA111').display_name, 'PLAYER A');
 
-  assert.deepEqual(await releasePlayerIdentity(client, 'AAA111'), { released: true });
+  assert.deepEqual(await releasePlayerIdentity(client, 'AAA111', 'RELEASE OPERATOR'), { released: true });
   assert.equal(client.players.has('AAA111'), false);
   assert.equal(client.profiles.has('AAA111'), false);
   assert.equal(client.profileVersions.has('AAA111'), false);
-  assert.equal(client.prizes.has('AAA111'), false);
+  assert.equal(client.prizes.get('AAA111').length, 1);
   assert.equal(client.claims.has('token-a'), false);
   assert.equal(client.access.get('AAA111').claimed_at, null);
+  assert.deepEqual(client.audits, [{
+    action: 'PLAYER_IDENTITY_RELEASED',
+    code: 'AAA111',
+    operator: 'RELEASE OPERATOR',
+    detail: {
+      destructive: true,
+      credentialReturnedToInventory: true,
+      prizeHistoryRetained: true
+    }
+  }]);
 
   assert.equal(await issueNextUnclaimedCode(client), 'AAA111');
+  await ensurePlayerIdentity(client, 'AAA111');
+  assert.equal(client.players.has('AAA111'), true);
+  assert.equal(client.profiles.has('AAA111'), false);
+  assert.equal(client.profileVersions.has('AAA111'), false);
+  assert.equal(client.claims.has('token-a'), false);
+  assert.equal(client.prizes.get('AAA111').length, 1);
+  assert.ok(client.access.get('AAA111').claimed_at);
 });
 
 test('owned credentials stay excluded even if non-ownership lifecycle fields look unused', async () => {
@@ -243,14 +263,18 @@ test('server release is privileged, exactly confirmed, destructive, and audited 
   assert.doesNotMatch(reset, /releasePlayerIdentity|PLAYER_IDENTITY_RELEASED/);
   assert.match(release, /requireAdmin/);
   assert.match(release, /confirmation !== code/);
-  assert.match(release, /releasePlayerIdentity\(client, code\)/);
-  assert.match(release, /PLAYER_IDENTITY_RELEASED/);
+  assert.match(release, /releasePlayerIdentity\(client, code, req\.missionOperator\)/);
   assert.match(identity, /DELETE FROM player_profiles/);
   assert.match(identity, /DELETE FROM players/);
   assert.match(identity, /claimed_at=NULL/);
+  assert.doesNotMatch(identity, /DELETE FROM prize_draws/);
+  assert.match(identity, /INSERT INTO mission_control_audit/);
+  assert.match(identity, /PLAYER_IDENTITY_RELEASED/);
+  assert.match(identity, /prizeHistoryRetained: true/);
   assert.match(admin, /DELETE PLAYER IDENTITY \+ RELEASE CREDENTIAL/);
   assert.match(admin, /window\.prompt/);
   assert.match(admin, /Type \$\{currentCode\} to confirm/);
+  assert.match(admin, /Historical prize and audit records remain attached to the credential/);
 });
 
 test('empty route repair delegates to gameplay reset instead of becoming a hidden release path', async () => {
@@ -287,7 +311,7 @@ test('Mission Control inventory count uses the same never-owned availability bou
 
 const integrationUrl = process.env.TEST_DATABASE_URL || '';
 
-test('PostgreSQL migration deterministically backfills real players and leaves test fixtures unclaimed', {
+test('PostgreSQL backfill and release preserve prize/audit history through credential reuse', {
   skip: integrationUrl ? false : 'set TEST_DATABASE_URL to run disposable durable-identity integration'
 }, async () => {
   const { Pool } = pg;
@@ -319,7 +343,83 @@ test('PostgreSQL migration deterministically backfills real players and leaves t
     assert.ok(rows.rows[0].claimed_at);
     assert.equal(rows.rows[1].code, 'TEST01');
     assert.equal(rows.rows[1].claimed_at, null);
+
+    await client.query(`CREATE TABLE quick_start_claims (
+      token_hash TEXT PRIMARY KEY,
+      code TEXT REFERENCES access_codes(code)
+    )`);
+    await client.query(`CREATE TABLE prize_draws (
+      id BIGSERIAL PRIMARY KEY,
+      code TEXT NOT NULL REFERENCES access_codes(code),
+      operator TEXT NOT NULL,
+      allow_repeat BOOLEAN NOT NULL DEFAULT FALSE,
+      drawn_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE player_profiles (
+      code TEXT PRIMARY KEY REFERENCES access_codes(code),
+      display_name TEXT NOT NULL DEFAULT ''
+    )`);
+    await client.query(`CREATE TABLE player_profile_versions (
+      id BIGSERIAL PRIMARY KEY,
+      code TEXT NOT NULL REFERENCES access_codes(code),
+      display_name TEXT NOT NULL DEFAULT ''
+    )`);
+    await client.query(`CREATE TABLE mission_control_audit (
+      id BIGSERIAL PRIMARY KEY,
+      action TEXT NOT NULL,
+      code TEXT,
+      operator TEXT NOT NULL,
+      detail JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query("INSERT INTO quick_start_claims(token_hash,code) VALUES('token-a','REAL01')");
+    await client.query("INSERT INTO player_profiles(code,display_name) VALUES('REAL01','PLAYER A')");
+    await client.query("INSERT INTO player_profile_versions(code,display_name) VALUES('REAL01','OLDER A')");
+    await client.query("INSERT INTO prize_draws(code,operator) VALUES('REAL01','DRAW OPERATOR')");
+
+    await client.query('BEGIN');
+    assert.deepEqual(await releasePlayerIdentity(client, 'REAL01', 'RELEASE OPERATOR'), { released: true });
+    await client.query('COMMIT');
+
+    const released = await client.query(`
+      SELECT a.claimed_at,a.status,
+        (SELECT COUNT(*)::int FROM players WHERE code=a.code) AS players,
+        (SELECT COUNT(*)::int FROM player_profiles WHERE code=a.code) AS profiles,
+        (SELECT COUNT(*)::int FROM player_profile_versions WHERE code=a.code) AS profile_versions,
+        (SELECT COUNT(*)::int FROM quick_start_claims WHERE code=a.code) AS claims,
+        (SELECT COUNT(*)::int FROM prize_draws WHERE code=a.code) AS prizes,
+        (SELECT COUNT(*)::int FROM mission_control_audit
+          WHERE code=a.code AND action='PLAYER_IDENTITY_RELEASED') AS release_audits
+      FROM access_codes a WHERE a.code='REAL01'
+    `);
+    assert.equal(released.rows[0].claimed_at, null);
+    assert.equal(released.rows[0].status, 'unused');
+    assert.equal(released.rows[0].players, 0);
+    assert.equal(released.rows[0].profiles, 0);
+    assert.equal(released.rows[0].profile_versions, 0);
+    assert.equal(released.rows[0].claims, 0);
+    assert.equal(released.rows[0].prizes, 1);
+    assert.equal(released.rows[0].release_audits, 1);
+
+    assert.equal(await issueNextUnclaimedCode(client), 'REAL01');
+    await ensurePlayerIdentity(client, 'REAL01');
+    const reused = await client.query(`
+      SELECT a.claimed_at,
+        (SELECT COUNT(*)::int FROM players WHERE code=a.code) AS players,
+        (SELECT COUNT(*)::int FROM player_profiles WHERE code=a.code) AS profiles,
+        (SELECT COUNT(*)::int FROM prize_draws WHERE code=a.code) AS prizes,
+        (SELECT detail->>'prizeHistoryRetained' FROM mission_control_audit
+          WHERE code=a.code AND action='PLAYER_IDENTITY_RELEASED'
+          ORDER BY id DESC LIMIT 1) AS prize_history_retained
+      FROM access_codes a WHERE a.code='REAL01'
+    `);
+    assert.ok(reused.rows[0].claimed_at);
+    assert.equal(reused.rows[0].players, 1);
+    assert.equal(reused.rows[0].profiles, 0);
+    assert.equal(reused.rows[0].prizes, 1);
+    assert.equal(reused.rows[0].prize_history_retained, 'true');
   } finally {
+    if (!client.ended) await client.query('ROLLBACK').catch(() => {});
     await client.query('SET search_path TO public');
     await client.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
     client.release();

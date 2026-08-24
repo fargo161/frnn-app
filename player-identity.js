@@ -61,20 +61,27 @@ export async function resetGameplay(client, code) {
   return access;
 }
 
-export async function releasePlayerIdentity(client, code) {
+export async function releasePlayerIdentity(client, code, operator = 'TEAM') {
   const access = await lockAccessCode(client, code);
   if (!access) return { error: 'PLAYER_NOT_FOUND', status: 404 };
   if (access.is_test) return { error: 'TEST_IDENTITY_RELEASE_NOT_ALLOWED', status: 409 };
   if (!access.claimed_at) return { error: 'PLAYER_IDENTITY_NOT_CLAIMED', status: 409 };
 
   await client.query('DELETE FROM quick_start_claims WHERE code=$1', [code]);
-  await client.query('DELETE FROM prize_draws WHERE code=$1', [code]);
   await client.query('DELETE FROM player_profile_versions WHERE code=$1', [code]);
   await client.query('DELETE FROM player_profiles WHERE code=$1', [code]);
   await client.query('DELETE FROM players WHERE code=$1', [code]);
   await client.query(
     "UPDATE access_codes SET status='unused',allocated_at=NULL,activated_at=NULL,claimed_at=NULL WHERE code=$1",
     [code]
+  );
+  await client.query(
+    'INSERT INTO mission_control_audit(action,code,operator,detail) VALUES($1,$2,$3,$4::jsonb)',
+    ['PLAYER_IDENTITY_RELEASED', code, operator, JSON.stringify({
+      destructive: true,
+      credentialReturnedToInventory: true,
+      prizeHistoryRetained: true
+    })]
   );
   return { released: true };
 }
