@@ -173,7 +173,7 @@ test('resolver integration remains Escape-only while six QR destinations and UI 
     read('../server.js'),
     read('../public/station.html')
   ]);
-  assert.match(server, /import \{ resolveNodeAssignment \} from '\.\/node-assignments\.js'/);
+  assert.match(server, /import \{ normalizeAssignedMessage, resolveNodeAssignment \} from '\.\/node-assignments\.js'/);
   const scanStart = server.indexOf("app.post('/api/scan/:station'");
   const scanEnd = server.indexOf("app.post('/api/response/:station'", scanStart);
   const scan = server.slice(scanStart, scanEnd);

@@ -59,7 +59,7 @@ import {
   isPrefetchRequest
 } from './quick-start.js';
 import { normalizeAnswer, answerMatches } from './answer-matching.js';
-import { resolveNodeAssignment } from './node-assignments.js';
+import { normalizeAssignedMessage, resolveNodeAssignment } from './node-assignments.js';
 import {
   lockAccessCode,
   ensurePlayerIdentity,
@@ -1183,6 +1183,74 @@ app.get('/api/admin/player/:accessCode', requireAdmin, async (req, res) => {
   const player = await playerRecord(code);
   if (!player) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
   res.json({ player });
+});
+
+app.put('/api/admin/player/:accessCode/escape-assignment', requireAdmin, async (req, res, next) => {
+  const code = normalizeAccessCode(req.params.accessCode);
+  const assignedMessage = normalizeAssignedMessage(req.body?.assignedMessage);
+  if (!assignedMessage) return res.status(400).json({ error: 'INVALID_ASSIGNMENT_MESSAGE' });
+  if (!code) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
+
+  try {
+    const saved = await withTransaction(async client => {
+      const player = await client.query('SELECT code FROM players WHERE code=$1 FOR UPDATE', [code]);
+      if (!player.rows[0]) return null;
+      const assignment = await client.query(
+        `INSERT INTO node_assignments(code,node_key,assignment_type,assigned_message,is_active)
+         VALUES($1,'escape','assigned_message',$2,TRUE)
+         ON CONFLICT (code,node_key) DO UPDATE SET
+           assignment_type='assigned_message',
+           assigned_message=EXCLUDED.assigned_message,
+           is_active=TRUE,
+           updated_at=NOW()
+         RETURNING assigned_message,is_active`,
+        [code, assignedMessage]
+      );
+      await audit(client, 'ESCAPE_ASSIGNMENT_SET', code, req.missionOperator, { nodeKey: 'escape' });
+      return assignment.rows[0];
+    });
+    if (!saved) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
+    res.json({
+      accessCode: formatAccessCode(code),
+      nodeKey: 'escape',
+      active: saved.is_active,
+      assignedMessage: saved.assigned_message
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/player/:accessCode/escape-assignment', requireAdmin, async (req, res, next) => {
+  const code = normalizeAccessCode(req.params.accessCode);
+  if (!code) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
+
+  try {
+    const cleared = await withTransaction(async client => {
+      const player = await client.query('SELECT code FROM players WHERE code=$1 FOR UPDATE', [code]);
+      if (!player.rows[0]) return null;
+      const assignment = await client.query(
+        `UPDATE node_assignments
+         SET is_active=FALSE,updated_at=NOW()
+         WHERE code=$1
+           AND node_key='escape'
+           AND assignment_type='assigned_message'
+           AND is_active=TRUE
+         RETURNING code`,
+        [code]
+      );
+      const changed = Boolean(assignment.rows[0]);
+      await audit(client, 'ESCAPE_ASSIGNMENT_CLEARED', code, req.missionOperator, {
+        nodeKey: 'escape',
+        changed
+      });
+      return { changed };
+    });
+    if (!cleared) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
+    res.json({ accessCode: formatAccessCode(code), nodeKey: 'escape', active: false });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post('/api/admin/player/:accessCode/reset', requireAdmin, async (req, res) => {

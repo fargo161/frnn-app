@@ -1,5 +1,11 @@
 import { STATIONS } from './lib.js';
 
+export function normalizeAssignedMessage(value) {
+  if (typeof value !== 'string') return null;
+  const message = value.trim();
+  return message.length >= 1 && message.length <= 1000 ? message : null;
+}
+
 export async function resolveNodeAssignment(client, { code, nodeKey, authoredDefault }) {
   if (!STATIONS.includes(nodeKey)) {
     throw new Error(`Unknown canonical node key: ${nodeKey}`);
