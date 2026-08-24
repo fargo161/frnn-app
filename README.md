@@ -155,9 +155,9 @@ docker compose up --build
 docker compose exec app npm run codes:import
 ```
 
-Then open `http://localhost:3000/s/start-end`, `http://localhost:3000/player`, or the public `http://localhost:3000/broadcast` viewer.
+Then open `http://localhost:3000/s/start-end`, `http://localhost:3000/player`, or `http://localhost:3000/admin`. Under the default Compose profile, sign in to Mission Control with `local-development-only`, then open the public `http://localhost:3000/broadcast` viewer in another tab or window.
 
-**Current Docker limitation:** the checked-in Compose profile does not provide `MISSION_CONTROL_PASSPHRASE`, so it cannot authenticate `/admin` or operate the Program Packager as written. Use the Node/PostgreSQL setup below for the complete local Broadcast walkthrough. This is a known configuration gap, not evidence that the Packager is absent from the application.
+The checked-in passphrase is for local development only. Override it by setting `MISSION_CONTROL_PASSPHRASE` in the operator environment before running Docker Compose. Production must not use this default; supply a separate private value through production environment/configuration.
 
 ### Node and PostgreSQL
 
@@ -184,7 +184,7 @@ npm start
 
 ### Local Program Packager + Broadcast walkthrough
 
-After starting the Node/PostgreSQL setup with `MISSION_CONTROL_PASSPHRASE` configured:
+After starting either local setup with `MISSION_CONTROL_PASSPHRASE` configured (or using Docker's development-only default):
 
 1. Open `http://localhost:3000/admin`, sign in with that passphrase, and find **Broadcast Program Packager** at the top of Mission Control.
 2. Open `http://localhost:3000/broadcast` in a separate tab, window, or browser. This is the public viewer/channel surface.

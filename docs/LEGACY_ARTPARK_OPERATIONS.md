@@ -182,9 +182,10 @@ docker compose exec app npm run codes:import
 Then open:
 
 - Player station: `http://localhost:3000/s/attention`
+- Mission Control: `http://localhost:3000/admin` (default local passphrase: `local-development-only`)
 - Public Broadcast viewer: `http://localhost:3000/broadcast`
 
-The checked-in Docker Compose profile does not configure `MISSION_CONTROL_PASSPHRASE`, so `/admin` login and the Program Packager are unavailable in that profile as written. The configured `ADMIN_KEY=local-development-only` is a maintenance credential and cannot log into Mission Control. Use the non-Docker setup below with an explicit `MISSION_CONTROL_PASSPHRASE` for the complete operator workflow.
+The default passphrase is development-only and can be overridden by setting `MISSION_CONTROL_PASSPHRASE` in the operator environment before starting Compose. Production must supply a separate private value through production environment/configuration. `ADMIN_KEY=local-development-only` remains a separate server-maintenance credential and is not the Mission Control login.
 
 Use any code from `data/access_codes.csv`.
 
