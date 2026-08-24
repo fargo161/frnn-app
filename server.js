@@ -66,6 +66,14 @@ import {
   migrateVideoConfiguration,
   choiceAtIndex
 } from './mission-interface.js';
+import {
+  isBroadcastError,
+  readBroadcastAdminState,
+  readBroadcastState,
+  replaceBroadcastPrograms,
+  startBroadcast,
+  stopBroadcast
+} from './broadcast.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -157,6 +165,15 @@ async function audit(client, action, code, operator, detail = {}) {
     'INSERT INTO mission_control_audit(action,code,operator,detail) VALUES($1,$2,$3,$4::jsonb)',
     [action, code || null, normalizeOperator(operator), JSON.stringify(detail)]
   );
+}
+
+function sendBroadcastError(res, error) {
+  if (!isBroadcastError(error)) return false;
+  const status = error.code === 'INVALID_PROGRAM_QUEUE' ? 400 : 409;
+  const body = { error: error.code };
+  if (error.details !== undefined) body.details = error.details;
+  res.status(status).json(body);
+  return true;
 }
 
 async function getDefaultConfig() {
@@ -409,6 +426,15 @@ app.get('/api/event', async (_req, res, next) => {
     const event = await getDefaultEvent(pool);
     if (!event) return res.status(503).json({ error: 'EVENT_NOT_CONFIGURED' });
     res.json({ event });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/broadcast', async (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    res.json(await readBroadcastState(pool));
   } catch (error) {
     next(error);
   }
@@ -755,6 +781,10 @@ app.get('/admin', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+app.get('/broadcast', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'broadcast.html'));
+});
+
 app.post('/api/mission-control/login', async (req, res) => {
   if (!MISSION_CONTROL_PASSPHRASE) return res.status(503).json({ error: 'MISSION_CONTROL_NOT_CONFIGURED' });
   if (!secureEqual(req.body?.passphrase, MISSION_CONTROL_PASSPHRASE)) {
@@ -780,6 +810,62 @@ app.post('/api/mission-control/logout', async (req, res) => {
   if (token) await pool.query('DELETE FROM mission_control_sessions WHERE token_hash=$1', [hashSessionToken(token)]);
   clearMissionCookie(res);
   res.json({ ok: true });
+});
+
+app.get('/api/admin/programs', requireAdmin, async (_req, res, next) => {
+  try {
+    res.json(await readBroadcastAdminState(pool));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/programs', requireAdmin, async (req, res, next) => {
+  try {
+    const state = await withTransaction(async client => {
+      const result = await replaceBroadcastPrograms(client, req.body?.programs);
+      await audit(client, 'BROADCAST_PROGRAMS_REPLACED', null, req.missionOperator, {
+        programCount: result.programs.length,
+        programIds: result.programs.map(program => program.id)
+      });
+      return result;
+    });
+    res.json(state);
+  } catch (error) {
+    if (!sendBroadcastError(res, error)) next(error);
+  }
+});
+
+app.post('/api/admin/broadcast/start', requireAdmin, async (req, res, next) => {
+  try {
+    const state = await withTransaction(async client => {
+      const result = await startBroadcast(client);
+      await audit(client, 'BROADCAST_STARTED', null, req.missionOperator, {
+        startedAt: result.started_at,
+        firstProgramId: result.programs[0].id,
+        programCount: result.programs.length
+      });
+      return result;
+    });
+    res.json(state);
+  } catch (error) {
+    if (!sendBroadcastError(res, error)) next(error);
+  }
+});
+
+app.post('/api/admin/broadcast/stop', requireAdmin, async (req, res, next) => {
+  try {
+    const state = await withTransaction(async client => {
+      const result = await stopBroadcast(client);
+      await audit(client, 'BROADCAST_STOPPED', null, req.missionOperator, {
+        programCount: result.programs.length
+      });
+      return result;
+    });
+    res.json(state);
+  } catch (error) {
+    if (!sendBroadcastError(res, error)) next(error);
+  }
 });
 
 app.get('/api/admin/summary', requireAdmin, async (_req, res) => {

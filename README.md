@@ -43,6 +43,7 @@ At commit `91f60d8ee4795a997b50f556f6ffdd21afcc2cda`, the repository proves:
 - **CURRENT base:** Mission Control at `/admin`, including shared-passphrase sessions, operational controls, audit records, profiles/history, Drawing Pool, and QR generation (`public/admin.html`, `/api/admin/*`).
 - **CURRENT:** numbered migration foundation (`schema_migrations`; `migrations/001_frnn_event_foundation.sql`).
 - **PARTIAL:** R2/S3-compatible media-storage adapter boundary with bounded listing and public-URL construction (`media-storage.js`); there is no upload pipeline yet.
+- **CURRENT / EXPERIMENTAL:** one global looping Program queue, PostgreSQL-authoritative master-clock anchor, bare Mission Control Packager, public `/api/broadcast` state, and minimal `/broadcast` viewer (`broadcast.js`, `migrations/002_broadcast_master_clock.sql`, `public/broadcast.html`). This is a bounded shared-clock experiment, not a production broadcast system.
 
 The detailed behavior of the inherited quest and field subsystem is preserved in [`docs/LEGACY_ARTPARK_OPERATIONS.md`](docs/LEGACY_ARTPARK_OPERATIONS.md).
 
@@ -57,7 +58,7 @@ The following are **PLANNED / TARGET DESIGN**, not current implementation claims
 - Master and Producer accounts with fine-grained permissions and approval workflows;
 - official event information and weather;
 - prerecorded Breaking News and Master-only Emergency state;
-- program, crawl, ticker, overlay, projector, and projection-mapping outputs.
+- richer Program/media composition, crawl, ticker, overlay, projector, and projection-mapping outputs.
 
 See [`COMBINATORIAL_ARCHITECTURE.md`](COMBINATORIAL_ARCHITECTURE.md) for module contracts, legal combinations, forbidden combinations, and invariants.
 
@@ -112,6 +113,7 @@ The complete rule set is in [`COMBINATORIAL_ARCHITECTURE.md`](COMBINATORIAL_ARCH
 |---|---|
 | `/quick-start` | Zero-typing bridge that atomically claims/reuses a production access code and enters Start/End |
 | `/player` | Early persistent player shell with owner-scoped profile and fixed quest progress |
+| `/broadcast` | Minimal public viewer for the one global authoritative Program timeline |
 | `/s/start-end` | Access-code entry plus opening/final framing and final reflection |
 | `/s/escape` | Physical quest station |
 | `/s/attention` | Physical quest station |
