@@ -246,7 +246,9 @@ The report is part of the pass, not an afterthought to its commit. When a pass i
 
 The report and index update should therefore normally be included in the same final commit they document.
 
-The final commit SHA may not exist when its report is written. Record the pre-commit state accurately as `PENDING FINAL COMMIT`; do not create a second report-only commit solely to insert the resulting SHA. The final chat response may provide the resulting SHA. Do not amend older reports to backfill commit metadata unless explicitly requested, and never rewrite or falsify report history.
+A report cannot contain the final SHA of the commit that contains that report. When the report and index update are included in the final commit they document, record their commit status as `INCLUDED IN THIS COMMIT`. This marker remains accurate after the commit is created and must also be used in the report index for that pass.
+
+The resulting final SHA is post-commit verification output: provide it in the final chat response after creating and verifying the commit. Do not edit the committed report or index solely to insert that SHA, and do not create or amend a commit merely to backfill it. A known base SHA may still be recorded when useful. Do not amend older reports to backfill commit metadata unless explicitly requested, and never rewrite or falsify report history.
 
 ### Non-Commit Passes
 
@@ -265,7 +267,7 @@ Every report must contain these sections:
 9. `IMPORTANT UNCERTAINTIES` — the most important remaining unknowns about behavior and causality.
 10. `RECOMMENDED NEXT EXPERIMENT` — the smallest experiment resolving the largest uncertainty, using `current claim → biggest uncertainty → minimum experiment → observable result` and NOW/NEXT/LATER/PARK when useful.
 11. `FILES MODIFIED` — every file created, modified, moved, or deleted during the pass.
-12. `COMMIT STATUS` — exactly one of `PENDING FINAL COMMIT`, `NOT COMMITTED`, `COMMITTED LOCALLY`, `PUSHED`, or `MERGED`, with SHA when available. Use `PENDING FINAL COMMIT` only when the report will be included in the final commit for the pass.
+12. `COMMIT STATUS` — exactly one of `INCLUDED IN THIS COMMIT`, `NOT COMMITTED`, `COMMITTED LOCALLY`, `PUSHED`, or `MERGED`, with a known SHA when applicable. Use `INCLUDED IN THIS COMMIT` when the report is included in the final commit it documents; its resulting SHA belongs in post-commit verification output rather than inside the report.
 
 The report is an audit artifact, not promotional documentation. Never silently convert intended design into an implementation claim or hide failures, unfinished work, shortcuts, or contradictions. Do not use claims such as complete, robust, production-ready, fully implemented, validated, or emergent unless the pass contains supporting evidence.
 
