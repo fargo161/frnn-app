@@ -1,13 +1,17 @@
 # FRNN Infrastructure
 
-This document records authenticated infrastructure relationships and production boundaries without storing secret values. It was reconciled from the completed Production Preflight on 2026-08-23/24. Application source remains provider-neutral inside the domain model and provider-aware only at deployment/storage boundaries.
+- **Status:** Current infrastructure orientation
+- **Application source last reconciled against:** `9087b534591a3025308f38f43368d6537b4a66cd` on `main` (2026-08-24)
+- **External provider state:** **UNCERTAIN** after the last authenticated observation on 2026-08-23/24
+
+This document separates current application-source facts from time-bound provider observations without storing secret values. The repository can establish the current application contract, but it cannot prove that Render, PostgreSQL, R2, or repository connections remained unchanged after the last authenticated Production Preflight. Application source remains provider-neutral inside the domain model and provider-aware only at deployment/storage boundaries.
 
 Start with the [FRNN project orientation](../README.md). Architectural ownership rules live in [the combinatorial architecture](../COMBINATORIAL_ARCHITECTURE.md).
 
-## Current production and target boundary
+## Application and observed production boundary
 
 ```text
-CURRENT PRODUCTION
+LAST AUTHENTICATED PRODUCTION OBSERVATION — 2026-08-23/24
 fargo161/artpark-adaptive-qr-cloud-v2 (main)
 SHA 881eb1dd013c46fb2c387aa5828a4b096e672551
                     │
@@ -19,32 +23,33 @@ srv-d9umd97lk1mc73e2ee00
 Render PostgreSQL             Cloudflare R2
 artpark-qr-db                 bucket: artpark
 
-TARGET APPLICATION — NOT YET CONNECTED OR DEPLOYED
+CURRENT APPLICATION SOURCE AT RECONCILIATION
 fargo161/frnn-app (main)
-reviewed application baseline: 91f60d8ee4795a997b50f556f6ffdd21afcc2cda
+SHA 9087b534591a3025308f38f43368d6537b4a66cd
+not proven connected or deployed by this source-only reconciliation
 ```
 
-Render is still connected to the historical repository. The source switch has not occurred. No FRNN production deployment has been approved or performed.
+At the last authenticated observation, Render was connected to the historical repository and no `frnn-app` source switch or production deployment had been approved or performed. Whether that external state changed afterward is **UNCERTAIN** in this source-only pass; do not present the repository itself as proof of live provider state.
 
 ## GitHub
 
 - Canonical target repository: <https://github.com/fargo161/frnn-app>
 - Default branch: `main`
-- Reviewed application-code baseline: `91f60d8ee4795a997b50f556f6ffdd21afcc2cda`
-- Current production repository: <https://github.com/fargo161/artpark-adaptive-qr-cloud-v2>
-- Current production branch/SHA: `main` at `881eb1dd013c46fb2c387aa5828a4b096e672551`
+- Application reconciliation point: `9087b534591a3025308f38f43368d6537b4a66cd`
+- Production repository observed on 2026-08-23/24: <https://github.com/fargo161/artpark-adaptive-qr-cloud-v2>
+- Production branch/SHA observed on 2026-08-23/24: `main` at `881eb1dd013c46fb2c387aa5828a4b096e672551`
 - History strategy: preserve reviewed canonical history; do not import unrelated experimental branches.
 
-The documentation-closeout commit may advance `frnn-app/main` without changing the reviewed application source. Any future deployment approval must identify the exact target commit then at `frnn-app/main`.
+The reconciliation SHA records when this document was checked; it is not permanent proof of future behavior. Any future deployment approval must identify and reverify the exact target commit then at `frnn-app/main`.
 
-## Render — authenticated inventory
+## Render — last authenticated inventory
 
 - Service: `artpark-adaptive-qr-cloud-v2`
 - Service ID: `srv-d9umd97lk1mc73e2ee00`
 - Dashboard: <https://dashboard.render.com/web/srv-d9umd97lk1mc73e2ee00>
-- Current source repository: `fargo161/artpark-adaptive-qr-cloud-v2`
-- Current source branch: `main`
-- Current deployed SHA: `881eb1dd013c46fb2c387aa5828a4b096e672551`
+- Source repository observed: `fargo161/artpark-adaptive-qr-cloud-v2`
+- Source branch observed: `main`
+- Deployed SHA observed: `881eb1dd013c46fb2c387aa5828a4b096e672551`
 - Deployed commit message: `Add winner name capture after final completion`
 - Deployment timestamp observed: August 22, 2026 at 1:44 PM
 - Deployment status observed: live
@@ -122,7 +127,7 @@ SHA:        881eb1dd013c46fb2c387aa5828a4b096e672551
 
 That SHA remains reachable in the historical repository and was proven in disposable verification to run against the migrated schema. Render artifact rollback availability depends on retention and plan, so repository/SHA rollback instructions must remain available.
 
-## Cloudflare R2 — authenticated read-only verification
+## Cloudflare R2 — last authenticated read-only verification
 
 - Account ID: `9af5298a5d7746f282305ef4f532af78`
 - Bucket: `artpark`
@@ -142,7 +147,7 @@ The application uses `media-storage.js` as its S3-compatible boundary. Domain co
 
 Player media must eventually enter a private/quarantine state and must not become public until validation and the applicable moderation/publication decision.
 
-## PostgreSQL — authenticated production resource
+## PostgreSQL — last authenticated production resource
 
 - Provider: Render managed PostgreSQL
 - Resource: `artpark-qr-db`
@@ -155,8 +160,8 @@ Player media must eventually enter a private/quarantine state and must not becom
 - External access rule observed: `0.0.0.0/0`
 - Connection is supplied to the service through `DATABASE_URL`; the URL and credentials are secret.
 - Schema initialization and numbered migrations run at application startup.
-- Current foundation migration: `migrations/001_frnn_event_foundation.sql`
-- Migration 001 has **not** been run on production by `frnn-app` because the source switch/deployment has not occurred.
+- Current application migrations: `migrations/001_frnn_event_foundation.sql` and `migrations/002_broadcast_master_clock.sql`
+- At the last authenticated observation, neither migration was proven applied by `frnn-app` in production because the source switch/deployment had not occurred.
 
 ### Backup verification
 
@@ -187,7 +192,7 @@ The Free database displayed a September 12, 2026 deletion warning. The operator 
 
 ## Production readiness boundary
 
-Application-level verification passed locally/disposably, and the production preflight recorded all technical gates as ready:
+The 2026-08-23/24 preflight passed its local/disposable application checks and recorded these gates against the then-reviewed, pre-Broadcast application baseline:
 
 - canonical `frnn-app` application SHA pinned;
 - current Render production source/SHA/configuration recorded;
@@ -198,7 +203,7 @@ Application-level verification passed locally/disposably, and the production pre
 - rollback SHA recorded;
 - source-switch deployment behavior understood.
 
-This evidence means **ready for a separately approved controlled deployment**, not deployed and not approved. Before a future source switch, revalidate any gate affected by changes to production data, credentials, R2 policy, Render configuration, or target source SHA.
+That historical evidence meant **ready for a separately approved controlled deployment** at the reviewed baseline; it does not establish the current `9087b53...` source as deployment-ready. Broadcast v0.1 subsequently added a migration, routes, APIs, and operator controls. Before any future source switch, revalidate the application build/tests and every gate affected by production data, credentials, R2 policy, Render configuration, migrations, or the target source SHA.
 
 ## Application environment-variable contract
 

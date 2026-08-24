@@ -28,9 +28,9 @@ Current Seed Festival: As Above So Below
 
 These identities are related but not interchangeable. FRNN is the platform, Fried News is its primary show, and As Above So Below is the seeded/current festival context.
 
-## Current proven foundation
+## Current implementation reality
 
-At commit `91f60d8ee4795a997b50f556f6ffdd21afcc2cda`, the repository proves:
+The following behaviors are present in the current source on `main`. This is a current-source orientation, not a frozen repository snapshot; historical commits identify when behavior was introduced, not what every later revision proves.
 
 - **CURRENT:** Node 20+ / Express application (`package.json`, `server.js`).
 - **CURRENT:** PostgreSQL authoritative state and startup migration runner (`schema.sql`, `db.js`).
@@ -44,6 +44,8 @@ At commit `91f60d8ee4795a997b50f556f6ffdd21afcc2cda`, the repository proves:
 - **CURRENT:** numbered migration foundation (`schema_migrations`; `migrations/001_frnn_event_foundation.sql`).
 - **PARTIAL:** R2/S3-compatible media-storage adapter boundary with bounded listing and public-URL construction (`media-storage.js`); there is no upload pipeline yet.
 - **CURRENT / EXPERIMENTAL:** one global looping Program queue, PostgreSQL-authoritative master-clock anchor, bare Mission Control Packager, public `/api/broadcast` state, and minimal `/broadcast` viewer (`broadcast.js`, `migrations/002_broadcast_master_clock.sql`, `public/broadcast.html`). This is a bounded shared-clock experiment, not a production broadcast system.
+
+Broadcast v0.1 was introduced in `9087b534591a3025308f38f43368d6537b4a66cd`; that SHA is historical provenance only.
 
 The detailed behavior of the inherited quest and field subsystem is preserved in [`docs/LEGACY_ARTPARK_OPERATIONS.md`](docs/LEGACY_ARTPARK_OPERATIONS.md).
 
@@ -124,7 +126,7 @@ The physical route is a proven subsystem, not the definition of every future FRN
 
 ## Current Mission Control
 
-`/admin` is the existing operator surface. It uses a shared `MISSION_CONTROL_PASSPHRASE` to create a secure, server-validated session and currently supports code operations, route inspection/repair/reset, content/video configuration, test codes, profiles/history, Drawing Pool, QR generation, and operational metrics.
+`/admin` is the existing operator surface and contains the experimental Broadcast Program Packager. It uses a shared `MISSION_CONTROL_PASSPHRASE` to create a secure, server-validated session and currently supports Program queue save/start/stop controls, code operations, route inspection/repair/reset, content/video configuration, test codes, profiles/history, Drawing Pool, QR generation, and operational metrics.
 
 Master/Producer accounts, individual capability grants, drafts, approval, publication, and broadcast activation are **PLANNED / TARGET DESIGN**. The existing admin gate must not be mistaken for that future permission system.
 
@@ -133,9 +135,11 @@ Master/Producer accounts, individual capability grants, drafts, approval, public
 Deployment and storage relationships are documented in [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md).
 
 ```text
-GitHub → Render → PostgreSQL
+last authenticated production observation:
+historical application repository → Render → PostgreSQL
 
-media → Cloudflare R2
+target application repository: frnn-app (not proven connected/deployed)
+media-storage boundary: Cloudflare R2
 ```
 
 PostgreSQL owns authoritative state and media metadata. Object storage owns media bytes. Render's local filesystem is not durable media storage. Never commit or document live credentials.
@@ -151,19 +155,15 @@ docker compose up --build
 docker compose exec app npm run codes:import
 ```
 
-Then open `http://localhost:3000/s/start-end`, `http://localhost:3000/player`, or `http://localhost:3000/admin`.
+Then open `http://localhost:3000/s/start-end`, `http://localhost:3000/player`, or the public `http://localhost:3000/broadcast` viewer.
+
+**Current Docker limitation:** the checked-in Compose profile does not provide `MISSION_CONTROL_PASSPHRASE`, so it cannot authenticate `/admin` or operate the Program Packager as written. Use the Node/PostgreSQL setup below for the complete local Broadcast walkthrough. This is a known configuration gap, not evidence that the Packager is absent from the application.
 
 ### Node and PostgreSQL
 
 Requirements: Node 20+ and PostgreSQL.
 
-```bash
-npm install
-npm run codes:import
-npm start
-```
-
-Required runtime variables:
+Configure these runtime variables before starting the application:
 
 ```text
 DATABASE_URL=postgres://...
@@ -172,7 +172,27 @@ MISSION_CONTROL_PASSPHRASE=<shared operator passphrase>
 NODE_ENV=development
 ```
 
+Then install, import the bundled access codes, and start the server:
+
+```bash
+npm install
+npm run codes:import
+npm start
+```
+
 `PUBLIC_BASE_URL` is required for authoritative QR destinations in deployed/print workflows. R2 variables are required only when using `media-storage.js`; see [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md). Do not point tests at production PostgreSQL.
+
+### Local Program Packager + Broadcast walkthrough
+
+After starting the Node/PostgreSQL setup with `MISSION_CONTROL_PASSPHRASE` configured:
+
+1. Open `http://localhost:3000/admin`, sign in with that passphrase, and find **Broadcast Program Packager** at the top of Mission Control.
+2. Open `http://localhost:3000/broadcast` in a separate tab, window, or browser. This is the public viewer/channel surface.
+3. While the channel is off air, edit the bounded Program queue and select **SAVE PROGRAM QUEUE**.
+4. Select **START BROADCAST**. The viewer reads `/api/broadcast` and follows the PostgreSQL-authoritative shared clock and ordered Program state.
+5. Select **STOP BROADCAST** in Mission Control to return the viewer to its explicit off-air state.
+
+Broadcast v0.1 is **CURRENT / EXPERIMENTAL**. It is one looping global queue and a minimal viewer, not production streaming infrastructure, a media library, YouTube integration, or a breaking-news system.
 
 The complete inherited setup, field workflow, QR, recovery, and production checklist is in [`docs/LEGACY_ARTPARK_OPERATIONS.md`](docs/LEGACY_ARTPARK_OPERATIONS.md).
 

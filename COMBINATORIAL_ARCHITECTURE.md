@@ -4,17 +4,15 @@
 
 This document is FRNN's architectural grammar: a way to describe features as lawful combinations of small modules rather than as pages, routes, or one-off special cases.
 
-## Repository snapshot and evidence language
+## Repository and evidence language
 
 - Repository: `fargo161/frnn-app`
-- Inspected branch: `main`
-- Inspected commit: `91f60d8ee4795a997b50f556f6ffdd21afcc2cda`
-- Worktree at inspection: clean and synchronized with `origin/main`
-- Inspection date: 2026-08-23
+- Current implementation statements refer to the current source on `main`, not a permanently authoritative frozen SHA.
+- Historical introduction commits may be recorded for provenance, but they do not prove later repository state.
 
 Status labels have strict meanings:
 
-- **CURRENT** — implemented and evidenced in this commit.
+- **CURRENT** — implemented in the current source.
 - **PARTIAL** — a bounded foundation exists, but not the full module described here.
 - **PLANNED / TARGET DESIGN** — required direction, not proof of implementation.
 - **DEFERRED** — intentionally outside the immediate build sequence.
@@ -138,9 +136,9 @@ Uses the same event abstraction at smaller scope; it must not introduce a parall
 
 Targets content or assignments to one persistent player regardless of event state.
 
-### Public Broadcast — TARGET DESIGN
+### Public Broadcast — CURRENT / EXPERIMENTAL BASE; TARGET DESIGN INCOMPLETE
 
-Targets approved content/state to shared outputs without exposing private identity.
+The current `/broadcast` viewer projects one global Program queue and PostgreSQL-authoritative clock through public `/api/broadcast` state without exposing private identity. Approval workflows, richer editorial state, and production output infrastructure remain target design.
 
 ```text
 EVENT ENDS ≠ PLAYER IDENTITY ENDS
@@ -215,15 +213,15 @@ FRNN PLATFORM
 | **Assignments** | Targets quest/content to player, event, or all players; availability/priority/consumption | Target + quest + authority → availability | Depends on Identity/Events/Quests/Auth; must not duplicate quest definition | **PLANNED:** manual first, rule-based later |
 | **Media** | Asset metadata, object keys, editorial asset intent | Upload/selection → validated asset reference | Bytes in object storage; must not store blobs in PostgreSQL or mutate domain state | **PARTIAL:** `media-storage.js` supports bounded listing/public URLs; add upload/quarantine/metadata lifecycle |
 | **Field Reports** | Moderation/publication lifecycle for player contributions | Player upload + approval → public report | Depends on Media/Identity/Approvals; must never publish merely because upload succeeded | **PLANNED** |
-| **Editorial / Program** | Stories, Fried News packages, ticker and scheduling | Draft items → ordered program state | Depends on Media/Approvals; must not own broadcast precedence | **PLANNED** |
-| **Broadcast State** | Normal/Breaking/Emergency precedence and active pointers | Approved activation → resolved broadcast state | Depends on Editorial/Auth/Audit; must preserve lower-priority state | **PLANNED** |
+| **Editorial / Program** | Stories, Fried News packages, ticker and scheduling | Draft items → ordered program state | Depends on Media/Approvals; must not own broadcast precedence | **CURRENT / EXPERIMENTAL base:** one ordered global Program queue and bare Mission Control Packager; stories, ticker, scheduling, and approval lifecycle remain planned |
+| **Broadcast State** | Normal/Breaking/Emergency precedence and active pointers | Approved activation → resolved broadcast state | Depends on Editorial/Auth/Audit; must preserve lower-priority state | **CURRENT / EXPERIMENTAL base:** one PostgreSQL master-clock anchor with explicit start/stop and looping queue; Normal/Breaking/Emergency precedence remains planned |
 | **Official Info** | Weather, announcements, event info | Authorized source/editor → scoped official item | Depends on Events/Approvals; must not be arbitrary style copy | **PLANNED** |
 | **Auth / Permissions** | Accounts, roles, capabilities, sessions | Credentials + policy → authorization decision | Must gate mutations and feed Audit; must not equate Producer with universal permission | **PARTIAL:** shared passphrase sessions/admin gate; add Master/Producer accounts and grants |
 | **Approvals** | Draft/review/publication transitions | Submitted change + decision → approved/rejected state | Depends on Auth/Audit; must not edit payload invisibly | **PLANNED** |
 | **Audit** | Immutable operator/system action history | Authorized action → actor/time/detail record | Receives from all mutating modules; must not become editable content | **PARTIAL:** `mission_control_audit`, profile versions, `prize_draws`; expand to all privileged lifecycle transitions |
 | **Player Surfaces** | Mobile projections and interactions | Scoped APIs → player UX/commands | Depends on domain APIs; must not invent completion/publication | **PARTIAL:** `public/station.html`, `player.html`, `quick-start.html`; add always-on shell/upload/crawl/personal quest views |
 | **Mission Control** | Operator projection and allowed commands | Authenticated APIs → operational UX | Depends on Auth/domain modules/Audit; must not become the database or bypass approvals | **CURRENT base / PARTIAL target:** `public/admin.html` plus `/api/admin/*`; add accounts, permissions, drafts, review |
-| **External Outputs** | Read-only public program/crawl/ticker/overlay projections | Resolved public state → browser/OBS/projector output | Depends on Broadcast/Editorial; must not expose secrets or own state | **PLANNED:** QR generation exists in `qr-routing.js`, but broadcast output surfaces do not |
+| **External Outputs** | Read-only public program/crawl/ticker/overlay projections | Resolved public state → browser/OBS/projector output | Depends on Broadcast/Editorial; must not expose secrets or own state | **CURRENT / EXPERIMENTAL base:** public `/api/broadcast` and minimal `/broadcast` viewer; crawl, ticker, overlay, OBS, and projector outputs remain planned |
 
 ## 9. Lawful combinations
 
@@ -505,13 +503,15 @@ Concrete current evidence includes:
 - `db.js`: startup schema application, numbered migration runner, transactions, health check.
 - `schema.sql`: identity, visits, responses, configuration, sessions, claims, profiles/history, prize draws, and audit tables.
 - `migrations/001_frnn_event_foundation.sql`: event table, default event, event-scoped foreign keys/indexes, normalized-name uniqueness.
-- `server.js`: `/healthz`, `/api/event`, `/api/me`, profile, access, scan/response/final, Start/End, Mission Control, profile/history, drawing, QR, config routes.
+- `migrations/002_broadcast_master_clock.sql`: ordered Program persistence and singleton broadcast clock anchor.
+- `broadcast.js`: Program validation, authoritative state resolution, queue replacement, and explicit start/stop behavior.
+- `server.js`: `/healthz`, `/api/event`, `/api/me`, profile, access, scan/response/final, Start/End, Mission Control, profile/history, drawing, QR, config, Program, and Broadcast routes.
 - `quick-start.js`: idempotent token hashing and locked code allocation.
 - `player-profiles.js`: scoped serializers, normalization, history-preserving changes.
 - `events.js`: safe theme projection and default active-event lookup.
 - `media-storage.js`: R2/S3 configuration, bounded list, public object URL boundary.
-- `public/station.html`, `public/player.html`, `public/admin.html`, `public/quick-start.html`: current presentation surfaces.
+- `public/station.html`, `public/player.html`, `public/admin.html`, `public/quick-start.html`, `public/broadcast.html`: current presentation surfaces.
 
-Design assumptions not proven by current source—and therefore kept **PLANNED/TARGET DESIGN**—include generic quests/assignments, persistent always-on editorial content, uploads/moderation/publication, Master/Producer accounts and grants, approvals, Weather / Info, broadcast precedence, Breaking/Emergency activation, and dedicated public output surfaces. Avatar support is visibly incomplete (`ownerProfileView` currently returns `avatarUrl: null`).
+Design assumptions not proven by current source—and therefore kept **PLANNED/TARGET DESIGN**—include generic quests/assignments, persistent always-on editorial content, uploads/moderation/publication, Master/Producer accounts and grants, approvals, Weather / Info, broadcast precedence, Breaking/Emergency activation, and richer crawl/ticker/overlay/OBS/projector outputs. Avatar support is visibly incomplete (`ownerProfileView` currently returns `avatarUrl: null`).
 
 This document defines how those systems should combine. It does not claim that their schemas, APIs, permission checks, or interfaces already exist.

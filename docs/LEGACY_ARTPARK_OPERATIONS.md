@@ -15,9 +15,9 @@ You deploy this app **once** to an always-on cloud host with a PostgreSQL databa
 - one unique access code = one player/group = one persistent progress record;
 - the player enters the code once, and the browser remembers them with a secure cookie;
 - the cloud database remembers discovery order;
-- each Functional station loops its pending video until a response is recorded, then uses its completion video;
+- each Functional station loops its pending video until the configured correct response is recorded, using a wrong-answer/hint video for retries and a completion video after success;
 - your concierge laptop is **not required for the game to keep running**;
-- your phone or laptop is only an optional Broadcast Monitor.
+- your phone or laptop is only an optional Mission Control console.
 
 The physical rubber stamps remain the proof that a lockbox was actually solved. A QR scan is narrative progress, not physical completion proof.
 
@@ -32,9 +32,9 @@ The physical rubber stamps remain the proof that a lockbox was actually solved. 
 7. Re-scanning a station preserves its original stage and does not advance the route.
 8. On another phone, entering the same code restores the same server-side progress.
 
-At each Functional station, the loop video and four-choice **What could YOU do...?** prompt remain available until a choice is persisted. A visit activates the station but does not complete its mission. Every displayed choice is valid: the interaction records participation and self-positioning, not quiz correctness. The first selected choice is locked, plays that station's completion video, remains visible on revisit, and is stored once per code/station.
+At each Functional station, the loop video and four-choice **What could YOU do...?** prompt remain available until the configured correct choice is selected. A visit activates the station but does not complete its mission. Mission Control configures one correct answer among the four choices. A wrong choice persists nothing, plays the station's wrong-answer/hint video, and allows retry; the correct choice is stored once per code/station, plays the completion video, and remains visible on revisit.
 
-Reflective-response state is independent from the Functional discovery route and physical stamps. Selecting a choice does not create a visit or change its stage. One response at each of the four stations sets the authoritative `videoRoundComplete` state.
+Response state is independent from the Functional discovery route and physical stamps. Selecting a choice does not create a visit or change its stage. One persisted correct response at each of the four stations sets the authoritative `videoRoundComplete` state.
 
 After all four reflective responses are complete, Start/End exposes one final free-text reflection; visits alone cannot unlock it. The final question has a loop video plus separate wrong- and correct-answer videos. The default question is **What did YOU do to get this far?** Matching is forgiving, deterministic, and server-side: it ignores case, harmless punctuation, apostrophe differences, and repeated whitespace while using token-aware configured keywords and phrases. An unrelated response plays the wrong-answer video, persists nothing, and returns to an unlimited retry.
 
@@ -68,7 +68,7 @@ You can close your laptop, lose your hotspot, or have no power at concierge and 
 
 The admin page can be opened from any internet-connected phone or laptop with the shared team Mission Control passphrase. Team operators never need the private server-side `ADMIN_KEY`.
 
-## What the Broadcast Monitor can do
+## What Mission Control can do
 
 Open `/admin`, enter `MISSION_CONTROL_PASSPHRASE`, and optionally enter an operator label. The secure browser session lasts up to 12 hours and ends immediately when the operator selects **LOG OUT**.
 
@@ -84,9 +84,9 @@ It shows:
 - player lookup by field access code;
 - route reset;
 - route repair/reconstruction;
-- editable loop and completion URLs for each of the four Functional stations;
+- editable loop, wrong-answer/hint, and completion URLs for each of the four Functional stations;
 - editable unauthorized/"come back later" video URL.
-- editable player prompts and four choices for every Functional station;
+- editable player prompts, four choices, and one designated correct choice for every Functional station;
 - editable final prompt, accepted phrases, retry copy, completion copy, and loop/wrong/correct video URLs;
 - per-player selected responses, reflective completion, final-response state, normalized submission, and timestamps.
 
@@ -123,7 +123,7 @@ A row lock on the player record serializes simultaneous scans. If two members of
 
 ## Reflective response and final-reflection configuration
 
-Mission Control's **Reflective Station Responses** section provides one prompt and exactly four editable choices for Escape, Attention, Access, and Sensory. All four are accepted. Selections are stored once under unique key `(code, station)` with the selected copy and completion timestamp; revisiting preserves the first response.
+Mission Control's **Reflective Station Responses** section provides one prompt, exactly four editable choices, and one designated correct choice for Escape, Attention, Access, and Sensory. Wrong choices are not stored. The configured correct choice is stored once under unique key `(code, station)` with the selected copy and completion timestamp; revisiting preserves that completed response.
 
 The separate **Final Reflection** editor controls its prompt, accepted keyword/phrase family, gentle retry copy, accepted copy, and loop/wrong/correct video URLs. Final matching happens only on the server, and accepted lists are never included in player configuration or station HTML. The canonical concierge phrase is likewise absent from pre-final templates/config and is returned only after an accepted final submission.
 
@@ -147,9 +147,9 @@ The admin dashboard accepts:
 - direct `.mp4`, `.webm`, or `.ogg` URLs (native mobile video player);
 - other external URLs (open as external transmission).
 
-Mission Control groups video routing into Start/End, Functional Stations, Unauthorized, and Final Question. Each Functional station has exactly `loopVideoUrl` and `completionVideoUrl`; the final question has exactly `loopVideoUrl`, `wrongVideoUrl`, and `correctVideoUrl`. Discovery Stage 1–4 remains route history and no longer selects Functional video content.
+Mission Control groups video routing into Start/End, Functional Stations, Unauthorized, and Final Question. Each Functional station has exactly `loopVideoUrl`, `wrongVideoUrl`, and `completionVideoUrl`; the final question has exactly `loopVideoUrl`, `wrongVideoUrl`, and `correctVideoUrl`. Discovery Stage 1–4 remains route history and no longer selects Functional video content.
 
-Mission Control preserves those 17 fields and adds `START/END // START VIDEO` and `START/END // END VIDEO`. Existing persisted values are merged with these new empty defaults rather than overwritten.
+Mission Control persists twelve Functional role fields, three final-question role fields, two Start/End fields, and one unauthorized field. Existing persisted values are merged with current defaults rather than overwritten.
 
 ## Mission Control QR Code Generator
 
@@ -182,8 +182,9 @@ docker compose exec app npm run codes:import
 Then open:
 
 - Player station: `http://localhost:3000/s/attention`
-- Broadcast Monitor: `http://localhost:3000/admin`
-- Local admin key: `local-development-only`
+- Public Broadcast viewer: `http://localhost:3000/broadcast`
+
+The checked-in Docker Compose profile does not configure `MISSION_CONTROL_PASSPHRASE`, so `/admin` login and the Program Packager are unavailable in that profile as written. The configured `ADMIN_KEY=local-development-only` is a maintenance credential and cannot log into Mission Control. Use the non-Docker setup below with an explicit `MISSION_CONTROL_PASSPHRASE` for the complete operator workflow.
 
 Use any code from `data/access_codes.csv`.
 
@@ -261,7 +262,7 @@ This creates high-resolution PNG and SVG QR files in `qr/`, plus a `.txt` file d
 - QR signs tested after printing.
 - Several complete random-order routes tested on real phones.
 - Recovery tested by entering one active code on a second phone.
-- All four choices at every station tested as valid, persistent, idempotent responses.
+- All four choices render; wrong choices persist nothing and allow retry; only the configured correct choice persists and completes each station response.
 - Final reflection tested for locking, forgiving matching, retry, idempotency, and reveal safety.
 - Concierge has printed backup access-code sheets/cards.
 - Physical stamps remain the completion authority.
@@ -279,9 +280,9 @@ Keep the admin key and Mission Control passphrase private. Operators use only th
 - `schema.sql` — persistent data model
 - `config.default.json` — initial visual/content configuration
 - `public/station.html` — player mobile interface
-- `public/admin.html` — Broadcast Monitor
+- `public/admin.html` — Mission Control, including the experimental Program Packager
 - `data/access_codes.csv` — included 2,500 field codes
 - `scripts/import-codes.js` — loads codes into PostgreSQL
 - `scripts/generate-qr.js` — generates final station QR files
 - `FIELD_OPERATIONS_QUICKSTART.md` — what you personally do at the festival
-- `DEPLOYMENT_HANDOFF.md` — what a developer/Codex needs to deploy it
+- [`archive/DEPLOYMENT_HANDOFF_PRE_CURRENT_RUNTIME.md`](archive/DEPLOYMENT_HANDOFF_PRE_CURRENT_RUNTIME.md) — historical pre-current deployment handoff; not current implementation or deployment truth

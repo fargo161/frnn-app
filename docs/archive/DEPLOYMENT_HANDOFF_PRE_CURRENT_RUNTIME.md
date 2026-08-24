@@ -1,3 +1,7 @@
+# HISTORICAL — DO NOT USE AS CURRENT IMPLEMENTATION TRUTH
+
+> Archived on 2026-08-24 during documentation reconciliation. This handoff describes a pre-current runtime and contains superseded Functional-station rules, including the false current claim that every station choice is accepted. It also records deployment guidance that was not reauthenticated in this source-only pass. Preserve it for provenance only; use current source, tests, [`README.md`](../../README.md), and [`docs/INFRASTRUCTURE.md`](../INFRASTRUCTURE.md) for present behavior and boundaries.
+
 # ARTPARK Adaptive QR Router v2 — Deployment Handoff
 
 ## Goal
