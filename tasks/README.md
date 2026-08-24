@@ -144,3 +144,6 @@ These artifacts are related, but they are not interchangeable reality states. Ap
 9. Every packet is tied to a baseline commit.
 10. Packets remain bounded enough for one implementation pass whenever practical.
 
+## Draft intake
+
+- [Broadcast Control Lab Task Packet 01 — Library / Queue / Active Snapshot](BCL_TASK_PACKET_01_LIBRARY_QUEUE_SNAPSHOT_DRAFT.md) is tracked as `DRAFT_NEEDS_REVISION`. It is not an active work order until its visible intake note is resolved and a fresh baseline inspection authorizes execution.

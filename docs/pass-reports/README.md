@@ -18,3 +18,6 @@
 | 2026-08-24 12:45 | Escape assignment set/clear contract Director pass | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1245_escape-assignment-set-clear-director.md) |
 | 2026-08-24 12:59 | Escape assignment authenticated SET/CLEAR contract | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1259_escape-assignment-set-clear.md) |
 | 2026-08-24 13:05 | Minimal Escape Mission Control authoring Director pass | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1305_escape-mission-control-authoring-director.md) |
+| 2026-08-24 16:52 | Broadcast Control Lab locked-design/current-reality audit | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1652_broadcast-control-lab-reality-audit.md) |
+| 2026-08-24 17:08 | Broadcast packaging/media and QR-mission integration brainstorm | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1708_broadcast-qr-integration-brainstorm.md) |
+| 2026-08-24 17:20 | Publish Broadcast Control Lab design baseline | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1720_publish-bcl-design-baseline.md) |
