@@ -1,6 +1,12 @@
-# ARTPARK 2026 — Adaptive QR Broadcast Router v2.0
+# FRNN Application
 
-This is the cloud-ready version of the ARTPARK QR puzzle router.
+The canonical application for the reusable festival platform: the **As Above So Below**
+festival shell, **Fried Rice News Network**, and its primary show **Fried News**.
+It preserves the cloud-ready ARTPARK adaptive QR and quest foundation while the
+event, player shell, media, and broadcast domains evolve in bounded passes.
+
+Deployment and storage relationships are documented in
+[`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md).
 
 ## The simple version
 

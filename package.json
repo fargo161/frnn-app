@@ -1,8 +1,8 @@
 {
-  "name": "artpark-adaptive-qr-cloud-v2",
+  "name": "frnn-app",
   "version": "2.0.0",
   "private": true,
-  "description": "Cloud-ready adaptive QR video router for ARTPARK 2026",
+  "description": "Reusable festival application platform for As Above So Below and Fried Rice News Network",
   "type": "module",
   "scripts": {
     "start": "node server.js",
@@ -12,8 +12,11 @@
     "codes:import": "node scripts/import-codes.js",
     "codes:generate": "node scripts/generate-codes.js"
   },
-  "engines": {"node": ">=20"},
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1116.0",
     "express": "^4.21.2",
     "pg": "^8.13.1",
     "qrcode": "^1.5.4"
