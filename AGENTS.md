@@ -232,6 +232,26 @@ Save reports under `docs/pass-reports/` with the filename:
 
 Do not overwrite an earlier report. Maintain `docs/pass-reports/README.md` as a chronological index containing only the date, pass name, commit, and report link.
 
+### Commit-Oriented Passes
+
+The report is part of the pass, not an afterthought to its commit. When a pass includes creating a final commit:
+
+1. Finish the substantive design, edit, or implementation work.
+2. Perform the required checks and tests.
+3. Create the mandatory timestamped report for the pass.
+4. Update `docs/pass-reports/README.md`.
+5. Review the final diff and verify the report against the evidence.
+6. Stage the substantive changes, pass report, and report-index update together.
+7. Create the final commit.
+
+The report and index update should therefore normally be included in the same final commit they document.
+
+The final commit SHA may not exist when its report is written. Record the pre-commit state accurately as `PENDING FINAL COMMIT`; do not create a second report-only commit solely to insert the resulting SHA. The final chat response may provide the resulting SHA. Do not amend older reports to backfill commit metadata unless explicitly requested, and never rewrite or falsify report history.
+
+### Non-Commit Passes
+
+When no commit is requested, still create the mandatory report and update the report index. Record the pass as `NOT COMMITTED`.
+
 Every report must contain these sections:
 
 1. `PASS` — task name, objective, branch if applicable, and relevant commit SHA if one exists.
@@ -245,7 +265,7 @@ Every report must contain these sections:
 9. `IMPORTANT UNCERTAINTIES` — the most important remaining unknowns about behavior and causality.
 10. `RECOMMENDED NEXT EXPERIMENT` — the smallest experiment resolving the largest uncertainty, using `current claim → biggest uncertainty → minimum experiment → observable result` and NOW/NEXT/LATER/PARK when useful.
 11. `FILES MODIFIED` — every file created, modified, moved, or deleted during the pass.
-12. `COMMIT STATUS` — exactly one of `NOT COMMITTED`, `COMMITTED LOCALLY`, `PUSHED`, or `MERGED`, with SHA when available.
+12. `COMMIT STATUS` — exactly one of `PENDING FINAL COMMIT`, `NOT COMMITTED`, `COMMITTED LOCALLY`, `PUSHED`, or `MERGED`, with SHA when available. Use `PENDING FINAL COMMIT` only when the report will be included in the final commit for the pass.
 
 The report is an audit artifact, not promotional documentation. Never silently convert intended design into an implementation claim or hide failures, unfinished work, shortcuts, or contradictions. Do not use claims such as complete, robust, production-ready, fully implemented, validated, or emergent unless the pass contains supporting evidence.
 
