@@ -174,6 +174,12 @@ NODE_ENV=development
 
 The complete inherited setup, field workflow, QR, recovery, and production checklist is in [`docs/LEGACY_ARTPARK_OPERATIONS.md`](docs/LEGACY_ARTPARK_OPERATIONS.md).
 
+## Workspace authority
+
+The only active FRNN workspace is `C:\Users\mcdon\Documents\ChatGPT\frnn-app`.
+
+The former `C:\Users\mcdon\Documents\ChatGPT\frnn` directory is retained only as historical/reference material and is not an active implementation workspace. Preserved [`archive/`](archive/README.md) material records provenance and historical evidence; it is not current implementation or deployment authority.
+
 ## Documentation map
 
 | Document | Authority and purpose |
@@ -184,6 +190,7 @@ The complete inherited setup, field workflow, QR, recovery, and production check
 | [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) | Current infrastructure, deployment relationships, and operational boundaries |
 | [`docs/LEGACY_ARTPARK_OPERATIONS.md`](docs/LEGACY_ARTPARK_OPERATIONS.md) | Historical and event-specific operational reference; not canonical FRNN architecture |
 | [`tasks/`](tasks/README.md) | Bounded implementation instructions tied to repository baselines; task packets describe intended work and are not evidence of implementation |
+| [`archive/`](archive/README.md) | Historical evidence and provenance; not current implementation or deployment authority |
 
 The [task packet protocol](tasks/README.md) defines packet headers, baseline checks, history preservation, implementation reports, and behavioral evidence expectations.
 

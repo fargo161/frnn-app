@@ -266,6 +266,16 @@ Similarity is not authorization.
 
 ---
 
+## 13. Sole Active Workspace
+
+`C:\Users\mcdon\Documents\ChatGPT\frnn-app` is the only active FRNN workspace for Codex. Implementation, design changes, task packets, tests, migrations, documentation changes, audits of current behavior, and deployment-configuration work must operate from this tracked repository.
+
+`C:\Users\mcdon\Documents\ChatGPT\frnn` is historical/reference material only. Do not implement features, create task packets, treat it as a parallel repository, infer current FRNN truth from it, or write new active FRNN work there unless the user explicitly requests a historical investigation.
+
+If content exists in both locations, `frnn-app` wins for current FRNN work. Historical provenance may still be inspected in `frnn`, but it does not override the tracked repository.
+
+---
+
 # Default Working Rule
 
 When uncertain, do not invent missing architecture.
