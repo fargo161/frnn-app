@@ -217,18 +217,19 @@ test('Mission Control lookup reports selected responses and final state', async 
 });
 
 test('all reset paths clear route, responses, and final reveal but preserve identity', async () => {
-  const server = await read('../server.js');
-  const resetStart = server.indexOf("app.post('/api/admin/player/:accessCode/reset'");
-  const resetEnd = server.indexOf("app.put('/api/admin/player/:accessCode/visits'", resetStart);
-  const reset = server.slice(resetStart, resetEnd);
+  const [server, identity] = await Promise.all([read('../server.js'), read('../player-identity.js')]);
+  const resetStart = identity.indexOf('export async function resetGameplay');
+  const resetEnd = identity.indexOf('export async function releasePlayerIdentity', resetStart);
+  const reset = identity.slice(resetStart, resetEnd);
   assert.match(reset, /DELETE FROM visits WHERE code=\$1/);
   assert.match(reset, /DELETE FROM video_answers WHERE code=\$1/);
   assert.match(reset, /DELETE FROM final_reflections WHERE code=\$1/);
-  assert.match(reset, /status='unused',allocated_at=NULL,activated_at=NULL/);
+  assert.doesNotMatch(reset.slice(0, reset.indexOf('if (access.is_test)')), /status='unused'|claimed_at=NULL/);
   assert.doesNotMatch(reset, /DELETE FROM players/);
   const testStart = server.indexOf("app.post('/api/admin/tests/:accessCode/reset'");
   const testEnd = server.indexOf("app.get('/api/admin/config'", testStart);
-  assert.match(server.slice(testStart, testEnd), /DELETE FROM final_reflections WHERE code=\$1/);
+  assert.match(server.slice(testStart, testEnd), /resetGameplay\(client, code\)/);
+  assert.match(reset, /if \(access\.is_test\)[\s\S]*status='unused'[\s\S]*claimed_at=NULL/);
 });
 
 test('PostgreSQL enforces one code to one persistent player', async () => {
@@ -238,10 +239,7 @@ test('PostgreSQL enforces one code to one persistent player', async () => {
 });
 
 test('simultaneous activation converges through row locking and unique insert recovery', async () => {
-  const server = await read('../server.js');
-  const lockStart = server.indexOf('async function lockAccessCode');
-  const authEnd = server.indexOf("app.get('/healthz'", lockStart);
-  const identity = server.slice(lockStart, authEnd);
+  const identity = await read('../player-identity.js');
   assert.match(identity, /access_codes WHERE code=\$1 FOR UPDATE/);
   assert.match(identity, /INSERT INTO players\(code\) VALUES\(\$1\) ON CONFLICT \(code\) DO NOTHING/);
   assert.match(identity, /SELECT code FROM players WHERE code=\$1 FOR UPDATE/);

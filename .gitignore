@@ -7,3 +7,6 @@ qr/*.png
 qr/*.svg
 qr/*.txt
 !qr/README.txt
+data/access_codes.local.csv
+data/access_codes_new.csv
+data/access_codes_*.private.csv

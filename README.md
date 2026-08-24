@@ -34,14 +34,14 @@ The following behaviors are present in the current source on `main`. This is a c
 
 - **CURRENT:** Node 20+ / Express application (`package.json`, `server.js`).
 - **CURRENT:** PostgreSQL authoritative state and startup migration runner (`schema.sql`, `db.js`).
-- **CURRENT:** private access-code identity, secure player cookie, and persistent player record (`access_codes`, `players`, `/api/access`).
-- **CURRENT:** idempotent QuickStart allocation (`quick_start_claims`, `quick-start.js`, `/quick-start`, `/api/quick-start`).
+- **CURRENT:** durable access-code ownership (`access_codes.claimed_at`), secure player cookie, persistent player record, and explicit privileged identity release (`player-identity.js`, `migrations/003_durable_player_identity.sql`, `/api/access`).
+- **CURRENT:** idempotent QuickStart allocation restricted to never-owned credentials, with reset-safe browser continuity (`quick_start_claims`, `quick-start.js`, `/quick-start`, `/api/quick-start`).
 - **CURRENT/PARTIAL:** unique display-name, profile-history, and event foundation (`player_profiles`, `player_profile_versions`, `events`, `migrations/001_frnn_event_foundation.sql`).
 - **PARTIAL:** `/player` shell and owner-scoped profile projection (`player-shell.js`, `public/player.html`).
 - **CURRENT:** four physical quest routes—`/s/escape`, `/s/attention`, `/s/access`, `/s/sensory`—plus `/s/start-end`.
 - **CURRENT:** fixed station visit, reflective response, final-reflection, and completion behavior (`visits`, `video_answers`, `final_reflections`, `public/station.html`).
 - **CURRENT base:** Mission Control at `/admin`, including shared-passphrase sessions, operational controls, audit records, profiles/history, Drawing Pool, and QR generation (`public/admin.html`, `/api/admin/*`).
-- **CURRENT:** numbered migration foundation (`schema_migrations`; `migrations/001_frnn_event_foundation.sql`).
+- **CURRENT:** numbered migration foundation (`schema_migrations`; `migrations/001_frnn_event_foundation.sql`, `002_broadcast_master_clock.sql`, `003_durable_player_identity.sql`).
 - **PARTIAL:** R2/S3-compatible media-storage adapter boundary with bounded listing and public-URL construction (`media-storage.js`); there is no upload pipeline yet.
 - **CURRENT / EXPERIMENTAL:** one global looping Program queue, PostgreSQL-authoritative master-clock anchor, bare Mission Control Packager, public `/api/broadcast` state, and minimal `/broadcast` viewer (`broadcast.js`, `migrations/002_broadcast_master_clock.sql`, `public/broadcast.html`). This is a bounded shared-clock experiment, not a production broadcast system.
 
@@ -126,7 +126,7 @@ The physical route is a proven subsystem, not the definition of every future FRN
 
 ## Current Mission Control
 
-`/admin` is the existing operator surface and contains the experimental Broadcast Program Packager. It uses a shared `MISSION_CONTROL_PASSPHRASE` to create a secure, server-validated session and currently supports Program queue save/start/stop controls, code operations, route inspection/repair/reset, content/video configuration, test codes, profiles/history, Drawing Pool, QR generation, and operational metrics.
+`/admin` is the existing operator surface and contains the experimental Broadcast Program Packager. It uses a shared `MISSION_CONTROL_PASSPHRASE` to create a secure, server-validated session and currently supports Program queue save/start/stop controls, code operations, route inspection/repair, gameplay reset, an explicitly confirmed identity-release control, content/video configuration, test codes, profiles/history, Drawing Pool, QR generation, and operational metrics. Gameplay reset preserves durable ownership and recovery continuity; only the separate destructive release returns a credential to unowned inventory.
 
 Master/Producer accounts, individual capability grants, drafts, approval, publication, and broadcast activation are **PLANNED / TARGET DESIGN**. The existing admin gate must not be mistaken for that future permission system.
 
@@ -152,8 +152,11 @@ Requirements: Docker Desktop.
 
 ```bash
 docker compose up --build
+docker compose exec app npm run codes:generate -- 2500
 docker compose exec app npm run codes:import
 ```
+
+Generation writes to ignored `data/access_codes.local.csv` by default. For any non-local environment, keep the credential CSV outside public source control and pass its private path explicitly to `npm run codes:import -- <private-path>`.
 
 Then open `http://localhost:3000/s/start-end`, `http://localhost:3000/player`, or `http://localhost:3000/admin`. Under the default Compose profile, sign in to Mission Control with `local-development-only`, then open the public `http://localhost:3000/broadcast` viewer in another tab or window.
 
@@ -172,13 +175,16 @@ MISSION_CONTROL_PASSPHRASE=<shared operator passphrase>
 NODE_ENV=development
 ```
 
-Then install, import the bundled access codes, and start the server:
+Then install, generate an ignored local credential inventory, import it, and start the server:
 
 ```bash
 npm install
+npm run codes:generate -- 2500
 npm run codes:import
 npm start
 ```
+
+`data/access_codes.example.csv` contains headers only. The previously tracked inventory remains recoverable from Git history and must be treated as compromised for future durable-identity use. No production credential rotation is performed automatically.
 
 `PUBLIC_BASE_URL` is required for authoritative QR destinations in deployed/print workflows. R2 variables are required only when using `media-storage.js`; see [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md). Do not point tests at production PostgreSQL.
 

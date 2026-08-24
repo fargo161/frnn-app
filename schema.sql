@@ -1,11 +1,13 @@
 CREATE TABLE IF NOT EXISTS access_codes (
   code TEXT PRIMARY KEY,
   status TEXT NOT NULL DEFAULT 'unused',
-  activated_at TIMESTAMPTZ
+  activated_at TIMESTAMPTZ,
+  claimed_at TIMESTAMPTZ
 );
 
 ALTER TABLE access_codes ADD COLUMN IF NOT EXISTS allocated_at TIMESTAMPTZ;
 ALTER TABLE access_codes ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE access_codes ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
 DO $$
 BEGIN
   IF EXISTS (
@@ -56,6 +58,7 @@ CREATE TABLE IF NOT EXISTS visits (
 CREATE INDEX IF NOT EXISTS visits_station_idx ON visits(station);
 CREATE INDEX IF NOT EXISTS visits_created_idx ON visits(created_at DESC);
 CREATE INDEX IF NOT EXISTS access_codes_active_idx ON access_codes(code) WHERE status='active' AND is_test=FALSE;
+CREATE INDEX IF NOT EXISTS access_codes_unclaimed_idx ON access_codes(code) WHERE claimed_at IS NULL AND is_test=FALSE;
 
 CREATE TABLE IF NOT EXISTS video_answers (
   code TEXT NOT NULL REFERENCES players(code) ON DELETE CASCADE,
@@ -151,6 +154,13 @@ UPDATE access_codes a SET status='active'
 WHERE EXISTS (SELECT 1 FROM players p WHERE p.code=a.code)
   AND a.activated_at IS NOT NULL
   AND a.status <> 'active';
+
+UPDATE access_codes a
+SET claimed_at=p.created_at
+FROM players p
+WHERE p.code=a.code
+  AND a.is_test=FALSE
+  AND a.claimed_at IS NULL;
 
 INSERT INTO access_codes(code,status,is_test)
 VALUES ('TEST01','unused',TRUE),('TEST02','unused',TRUE),('TEST03','unused',TRUE),('TEST04','unused',TRUE),('TEST05','unused',TRUE)

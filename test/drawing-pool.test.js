@@ -108,10 +108,10 @@ test('Drawing Pool endpoints require admin, audit winners, and return the contro
 });
 
 test('player reset deletes final completion but preserves prize history', async () => {
-  const server = await read('../server.js');
-  const start = server.indexOf("app.post('/api/admin/player/:accessCode/reset'");
-  const end = server.indexOf("app.put('/api/admin/player/:accessCode/visits'", start);
-  const reset = server.slice(start, end);
+  const identity = await read('../player-identity.js');
+  const start = identity.indexOf('export async function resetGameplay');
+  const end = identity.indexOf('export async function releasePlayerIdentity', start);
+  const reset = identity.slice(start, end);
   assert.match(reset, /DELETE FROM final_reflections WHERE code=\$1/);
   assert.doesNotMatch(reset, /DELETE FROM prize_draws/);
 });

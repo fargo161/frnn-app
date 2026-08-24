@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const count = Number(process.argv[2] || 2500);
+const output = process.argv[3] || path.resolve(__dirname, '../data/access_codes.local.csv');
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const set = new Set();
 while (set.size < count) {
@@ -13,6 +14,6 @@ while (set.size < count) {
   set.add(code);
 }
 const rows=['code,status',...Array.from(set).map(c=>`${c.slice(0,3)}-${c.slice(3)},unused`)];
-const target=path.resolve(__dirname,'../data/access_codes_new.csv');
+const target=path.resolve(output);
 await fs.writeFile(target,rows.join('\n')+'\n');
 console.log(`Generated ${count} codes at ${target}`);

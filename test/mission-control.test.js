@@ -50,6 +50,7 @@ test('schema migration preserves inventory and adds lifecycle, sessions, audit, 
   const schema = await fs.readFile(new URL('../schema.sql', import.meta.url), 'utf8');
   assert.match(schema, /status IN \('unused','active'\)/);
   assert.match(schema, /allocated_at TIMESTAMPTZ/);
+  assert.match(schema, /claimed_at TIMESTAMPTZ/);
   assert.match(schema, /UPDATE access_codes SET status='unused' WHERE status='issued'/);
   assert.match(schema, /is_test BOOLEAN NOT NULL DEFAULT FALSE/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS mission_control_sessions/);
@@ -63,23 +64,30 @@ test('schema migration preserves inventory and adds lifecycle, sessions, audit, 
 });
 
 test('server implements atomic issue, isolated metrics, locked reset, and cookie sessions', async () => {
-  const server = await fs.readFile(new URL('../server.js', import.meta.url), 'utf8');
-  assert.match(server, /FOR UPDATE SKIP LOCKED LIMIT 1/);
-  assert.match(server, /status='unused' AND allocated_at IS NULL/);
-  assert.match(server, /SET allocated_at=NOW\(\),activated_at=NULL/);
+  const [server, identity] = await Promise.all([
+    fs.readFile(new URL('../server.js', import.meta.url), 'utf8'),
+    fs.readFile(new URL('../player-identity.js', import.meta.url), 'utf8')
+  ]);
+  const resetStart = identity.indexOf('export async function resetGameplay');
+  const releaseStart = identity.indexOf('export async function releasePlayerIdentity', resetStart);
+  const reset = identity.slice(resetStart, releaseStart);
+  assert.match(identity, /FOR UPDATE SKIP LOCKED[\s\S]*LIMIT 1/);
+  assert.match(identity, /status='unused'[\s\S]*allocated_at IS NULL[\s\S]*claimed_at IS NULL/);
+  assert.match(identity, /SET allocated_at=NOW\(\),activated_at=NULL/);
   assert.match(server, /status: 'unused'/);
   assert.doesNotMatch(server, /issued:\s*counts|status: 'issued'/);
   assert.match(server, /WHERE is_test=FALSE/);
-  assert.match(server, /DELETE FROM visits WHERE code=\$1/);
-  assert.match(server, /DELETE FROM video_answers WHERE code=\$1/);
-  assert.match(server, /DELETE FROM final_reflections WHERE code=\$1/);
-  assert.doesNotMatch(server, /DELETE FROM players WHERE code=\$1/);
-  assert.match(server, /status='unused',allocated_at=NULL,activated_at=NULL/);
+  assert.match(reset, /DELETE FROM visits WHERE code=\$1/);
+  assert.match(reset, /DELETE FROM video_answers WHERE code=\$1/);
+  assert.match(reset, /DELETE FROM final_reflections WHERE code=\$1/);
+  assert.doesNotMatch(reset, /DELETE FROM players WHERE code=\$1/);
+  assert.match(reset, /if \(access\.is_test\)/);
+  assert.doesNotMatch(reset.slice(0, reset.indexOf('if (access.is_test)')), /status='unused'|claimed_at=NULL/);
   assert.match(server, /if \(!player\?\.active\)/);
   assert.match(server, /!bodyCode && access\.status !== 'active'/);
   assert.match(server, /HttpOnly; SameSite=Strict/);
   assert.match(server, /DELETE FROM mission_control_sessions WHERE token_hash=\$1/);
-  assert.match(server, /status='active',activated_at=COALESCE\(activated_at,NOW\(\)\)/);
+  assert.match(identity, /status='active'[\s\S]*activated_at=COALESCE\(activated_at,NOW\(\)\)[\s\S]*claimed_at=CASE/);
 });
 
 test('active receiver directory is authenticated, read-only, lifecycle-consistent, and ordered', async () => {

@@ -2,9 +2,9 @@
 
 ## Mission Control
 
-Open `/admin` on any internet-connected phone or laptop and enter the shared team passphrase. Use **ISSUE NEXT FIELD CODE** instead of opening the production CSV. The lifecycle is `UNUSED → ACTIVE → COMPLETE`; showing or handing out a code leaves it `UNUSED` until the player enters it successfully. Select **LOG OUT** when finished.
+Open `/admin` on any internet-connected phone or laptop and enter the shared team passphrase. Use **ISSUE NEXT FIELD CODE** instead of opening the private credential inventory. A real credential becomes durably owned on first activation and is never issued to another player by normal operations. Select **LOG OUT** when finished.
 
-`RESET PROGRESS` clears the digital route and removes Active status, but keeps the code valid for a fresh Stage 1 activation later. It does not affect physical stamps. `TEST-01` through `TEST-05` exercise the real routing system without changing event counts.
+`RESET GAMEPLAY` clears the digital route, responses, and final reflection while preserving durable identity, recovery continuity, profile/history, and prize history. It does not affect physical stamps. **DELETE PLAYER IDENTITY + RELEASE CREDENTIAL** is a separate destructive operator action requiring typed code confirmation; use it only when permanent deletion and reuse are intended. `TEST-01` through `TEST-05` remain explicitly reusable fixtures and do not change event counts.
 
 ## What you need at concierge
 
@@ -41,7 +41,7 @@ Same procedure. Your dashboard is temporarily unavailable, but player phones sti
 
 ## If a player's phone dies
 
-They can enter the same unique code on another phone. The same persistent route reappears.
+They can enter the same unique code on another phone. Their same durable identity, retained profile, and current route reappear. After a gameplay reset, the same code restores the same identity with fresh quest progress.
 
 ## If a player says a station did not register
 

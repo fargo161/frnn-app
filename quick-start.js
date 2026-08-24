@@ -6,7 +6,7 @@ export const QUICK_START_UNAVAILABLE = 'QUICK START TEMPORARILY UNAVAILABLE // R
 export const QUICK_START_CANDIDATE_SQL = `
   SELECT code
   FROM access_codes
-  WHERE status='unused' AND allocated_at IS NULL AND is_test=FALSE
+  WHERE status='unused' AND allocated_at IS NULL AND claimed_at IS NULL AND is_test=FALSE
   ORDER BY code
   FOR UPDATE SKIP LOCKED
   LIMIT 1

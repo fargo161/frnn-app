@@ -60,6 +60,13 @@ import {
 } from './quick-start.js';
 import { normalizeAnswer, answerMatches } from './answer-matching.js';
 import {
+  lockAccessCode,
+  ensurePlayerIdentity,
+  issueNextUnclaimedCode,
+  resetGameplay,
+  releasePlayerIdentity
+} from './player-identity.js';
+import {
   FINAL_PHRASE,
   sanitizeStationChoiceDefinition,
   sanitizeFinalReflection,
@@ -227,7 +234,7 @@ async function setContentConfig(value) {
 }
 
 async function playerRecord(code, client = pool) {
-  const access = await client.query('SELECT code,status,allocated_at,activated_at,is_test FROM access_codes WHERE code=$1', [code]);
+  const access = await client.query('SELECT code,status,allocated_at,activated_at,claimed_at,is_test FROM access_codes WHERE code=$1', [code]);
   if (!access.rows[0]) return null;
   const player = await client.query('SELECT code, created_at, updated_at FROM players WHERE code=$1', [code]);
   const visits = await client.query('SELECT station, stage, created_at FROM visits WHERE code=$1 ORDER BY stage', [code]);
@@ -245,6 +252,7 @@ async function playerRecord(code, client = pool) {
     accessCode: formatAccessCode(code),
     status: complete ? 'complete' : access.rows[0].status,
     active: access.rows[0].status === 'active',
+    claimed: Boolean(access.rows[0].claimed_at),
     test: access.rows[0].is_test,
     visits: publicVisitRows,
     complete,
@@ -262,20 +270,6 @@ async function playerRecord(code, client = pool) {
     createdAt: player.rows[0]?.created_at || null,
     updatedAt: player.rows[0]?.updated_at || null
   };
-}
-
-async function lockAccessCode(client, code) {
-  const result = await client.query(
-    'SELECT code,status,activated_at FROM access_codes WHERE code=$1 FOR UPDATE',
-    [code]
-  );
-  return result.rows[0] || null;
-}
-
-async function ensurePlayerIdentity(client, code) {
-  await client.query('INSERT INTO players(code) VALUES($1) ON CONFLICT (code) DO NOTHING', [code]);
-  await client.query("UPDATE access_codes SET status='active',activated_at=COALESCE(activated_at,NOW()) WHERE code=$1", [code]);
-  await client.query('SELECT code FROM players WHERE code=$1 FOR UPDATE', [code]);
 }
 
 async function authorizeCode(rawCode, res) {
@@ -870,7 +864,10 @@ app.post('/api/admin/broadcast/stop', requireAdmin, async (req, res, next) => {
 
 app.get('/api/admin/summary', requireAdmin, async (_req, res) => {
   const [inventory, complete, stationCounts, recent, videoComplete, videoStationCounts, finalComplete] = await Promise.all([
-    pool.query("SELECT status,COUNT(*)::int AS count FROM access_codes WHERE is_test=FALSE GROUP BY status"),
+    pool.query(`SELECT
+      COUNT(*) FILTER (WHERE status='unused' AND allocated_at IS NULL AND claimed_at IS NULL)::int AS unused,
+      COUNT(*) FILTER (WHERE status='active')::int AS active
+      FROM access_codes WHERE is_test=FALSE`),
     pool.query('SELECT COUNT(*)::int AS count FROM (SELECT v.code FROM visits v JOIN access_codes a ON a.code=v.code WHERE a.is_test=FALSE GROUP BY v.code HAVING COUNT(*)=4) q'),
     pool.query('SELECT v.station,COUNT(*)::int AS count FROM visits v JOIN access_codes a ON a.code=v.code WHERE a.is_test=FALSE GROUP BY v.station'),
     pool.query('SELECT v.code,v.station,v.stage,v.created_at FROM visits v JOIN access_codes a ON a.code=v.code WHERE a.is_test=FALSE ORDER BY v.created_at DESC LIMIT 20'),
@@ -878,8 +875,10 @@ app.get('/api/admin/summary', requireAdmin, async (_req, res) => {
     pool.query('SELECT va.station,COUNT(*)::int AS count FROM video_answers va JOIN access_codes a ON a.code=va.code WHERE a.is_test=FALSE GROUP BY va.station'),
     pool.query('SELECT COUNT(*)::int AS count FROM final_reflections fr JOIN access_codes a ON a.code=fr.code WHERE a.is_test=FALSE')
   ]);
-  const counts = { unused: 0, active: 0 };
-  for (const row of inventory.rows) counts[row.status] = Number(row.count);
+  const counts = {
+    unused: Number(inventory.rows[0]?.unused || 0),
+    active: Number(inventory.rows[0]?.active || 0)
+  };
   const byStation = Object.fromEntries(STATIONS.map(s => [s, 0]));
   for (const row of stationCounts.rows) byStation[row.station] = Number(row.count);
   const videoByStation = Object.fromEntries(STATIONS.map(s => [s, 0]));
@@ -1151,12 +1150,8 @@ app.delete('/api/admin/player-profile/:code', requireAdmin, async (req, res) => 
 
 app.post('/api/admin/codes/issue', requireAdmin, async (req, res) => {
   const allocated = await withTransaction(async client => {
-    const result = await client.query(
-      "SELECT code FROM access_codes WHERE status='unused' AND allocated_at IS NULL AND is_test=FALSE ORDER BY code FOR UPDATE SKIP LOCKED LIMIT 1"
-    );
-    if (!result.rows[0]) return null;
-    const code = result.rows[0].code;
-    await client.query('UPDATE access_codes SET allocated_at=NOW(),activated_at=NULL WHERE code=$1', [code]);
+    const code = await issueNextUnclaimedCode(client);
+    if (!code) return null;
     await audit(client, 'code_allocated', code, req.missionOperator);
     return code;
   });
@@ -1173,18 +1168,16 @@ app.get('/api/admin/player/:accessCode', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/player/:accessCode/reset', requireAdmin, async (req, res) => {
   const code = normalizeAccessCode(req.params.accessCode);
-  const exists = await pool.query('SELECT code FROM access_codes WHERE code=$1', [code]);
-  if (!exists.rows[0]) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
-  await withTransaction(async client => {
-    await client.query('SELECT code FROM access_codes WHERE code=$1 FOR UPDATE', [code]);
-    await client.query('DELETE FROM visits WHERE code=$1', [code]);
-    await client.query('DELETE FROM video_answers WHERE code=$1', [code]);
-    await client.query('DELETE FROM final_reflections WHERE code=$1', [code]);
-    await client.query('DELETE FROM quick_start_claims WHERE code=$1', [code]);
-    await client.query('UPDATE players SET updated_at=NOW() WHERE code=$1', [code]);
-    await client.query("UPDATE access_codes SET status='unused',allocated_at=NULL,activated_at=NULL WHERE code=$1", [code]);
-    await audit(client, 'player_reset', code, req.missionOperator);
+  const reset = await withTransaction(async client => {
+    const access = await resetGameplay(client, code);
+    if (!access) return null;
+    await audit(client, 'PLAYER_GAMEPLAY_RESET', code, req.missionOperator, {
+      durableOwnershipPreserved: !access.is_test && Boolean(access.claimed_at),
+      testFixture: Boolean(access.is_test)
+    });
+    return access;
   });
+  if (!reset) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
   res.json({ player: await playerRecord(code) });
 });
 
@@ -1195,25 +1188,40 @@ app.put('/api/admin/player/:accessCode/visits', requireAdmin, async (req, res) =
   const exists = await pool.query('SELECT code FROM access_codes WHERE code=$1', [code]);
   if (!exists.rows[0]) return res.status(404).json({ error: 'PLAYER_NOT_FOUND' });
   await withTransaction(async client => {
-    await client.query('SELECT code FROM access_codes WHERE code=$1 FOR UPDATE', [code]);
-    await client.query('DELETE FROM visits WHERE code=$1', [code]);
     if (stations.length) {
+      await lockAccessCode(client, code);
+      await client.query('DELETE FROM visits WHERE code=$1', [code]);
       await ensurePlayerIdentity(client, code);
       for (let i = 0; i < stations.length; i += 1) {
         await client.query('INSERT INTO visits(code,station,stage) VALUES($1,$2,$3)', [code, stations[i], i + 1]);
       }
       await client.query('UPDATE players SET updated_at=NOW() WHERE code=$1', [code]);
-      await client.query("UPDATE access_codes SET status='active',activated_at=COALESCE(activated_at,NOW()) WHERE code=$1", [code]);
     } else {
-      await client.query('DELETE FROM video_answers WHERE code=$1', [code]);
-      await client.query('DELETE FROM final_reflections WHERE code=$1', [code]);
-      await client.query('DELETE FROM quick_start_claims WHERE code=$1', [code]);
-      await client.query('UPDATE players SET updated_at=NOW() WHERE code=$1', [code]);
-      await client.query("UPDATE access_codes SET status='unused',allocated_at=NULL,activated_at=NULL WHERE code=$1", [code]);
+      await resetGameplay(client, code);
     }
     await audit(client, 'route_repaired', code, req.missionOperator, { stations });
   });
   res.json({ player: await playerRecord(code) });
+});
+
+app.delete('/api/admin/player/:accessCode/identity', requireAdmin, async (req, res) => {
+  const code = normalizeAccessCode(req.params.accessCode);
+  const confirmation = normalizeAccessCode(req.body?.confirmation);
+  if (!code || confirmation !== code) {
+    return res.status(400).json({ error: 'IDENTITY_RELEASE_CONFIRMATION_REQUIRED' });
+  }
+
+  const result = await withTransaction(async client => {
+    const released = await releasePlayerIdentity(client, code);
+    if (released.error) return released;
+    await audit(client, 'PLAYER_IDENTITY_RELEASED', code, req.missionOperator, {
+      destructive: true,
+      credentialReturnedToInventory: true
+    });
+    return released;
+  });
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.json({ ok: true, accessCode: formatAccessCode(code), status: 'unused' });
 });
 
 app.get('/api/admin/tests', requireAdmin, async (_req, res) => {
@@ -1266,12 +1274,8 @@ app.post('/api/admin/tests/:accessCode/reset', requireAdmin, async (req, res) =>
   const code = normalizeAccessCode(req.params.accessCode);
   if (!TEST_CODES.includes(code)) return res.status(404).json({ error: 'TEST_CODE_NOT_FOUND' });
   await withTransaction(async client => {
-    await client.query('SELECT code FROM access_codes WHERE code=$1 AND is_test=TRUE FOR UPDATE', [code]);
-    await client.query('DELETE FROM visits WHERE code=$1', [code]);
-    await client.query('DELETE FROM video_answers WHERE code=$1', [code]);
-    await client.query('DELETE FROM final_reflections WHERE code=$1', [code]);
-    await client.query('UPDATE players SET updated_at=NOW() WHERE code=$1', [code]);
-    await client.query("UPDATE access_codes SET status='unused',allocated_at=NULL,activated_at=NULL WHERE code=$1 AND is_test=TRUE", [code]);
+    const access = await resetGameplay(client, code);
+    if (!access?.is_test) throw new Error('TEST_CODE_STATE_INVALID');
     await audit(client, 'test_reset', code, req.missionOperator);
   });
   res.json({ player: await playerRecord(code) });

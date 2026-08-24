@@ -27,7 +27,7 @@ function fakeClient(shared) {
   return {
     async query(sql, values = []) {
       if (String(sql).includes('FOR UPDATE SKIP LOCKED')) {
-        const candidate = shared.find(row => row.status === 'unused' && !row.allocated && !row.test && !row.locked);
+        const candidate = shared.find(row => row.status === 'unused' && !row.allocated && !row.claimed && !row.test && !row.locked);
         if (!candidate) return { rows: [] };
         candidate.locked = true;
         await new Promise(resolve => setTimeout(resolve, 5));
@@ -73,6 +73,7 @@ test('Quick Start candidate SQL atomically locks one unallocated UNUSED non-test
   assert.equal(QUICK_START_ROUTE, '/quick-start');
   assert.match(QUICK_START_CANDIDATE_SQL, /status='unused'/);
   assert.match(QUICK_START_CANDIDATE_SQL, /allocated_at IS NULL/);
+  assert.match(QUICK_START_CANDIDATE_SQL, /claimed_at IS NULL/);
   assert.match(QUICK_START_CANDIDATE_SQL, /is_test=FALSE/);
   assert.match(QUICK_START_CANDIDATE_SQL, /FOR UPDATE SKIP LOCKED/);
   assert.match(QUICK_START_CANDIDATE_SQL, /LIMIT 1/);
@@ -240,12 +241,17 @@ test('Quick Start name save preserves profile contact and notes through the cano
   assert.match(helper, /savePlayerProfileWithHistory/);
 });
 
-test('schema persists idempotency claims and player resets release their mappings', async () => {
-  const [schema, server] = await Promise.all([read('../schema.sql'), read('../server.js')]);
+test('schema persists idempotency claims, gameplay reset preserves them, and identity release clears them', async () => {
+  const [schema, identity] = await Promise.all([read('../schema.sql'), read('../player-identity.js')]);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS quick_start_claims/);
   assert.match(schema, /token_hash TEXT PRIMARY KEY/);
   assert.match(schema, /code TEXT REFERENCES access_codes\(code\) ON DELETE CASCADE/);
-  assert.equal(server.match(/DELETE FROM quick_start_claims WHERE code=\$1/g)?.length, 2);
+  const resetStart = identity.indexOf('export async function resetGameplay');
+  const releaseStart = identity.indexOf('export async function releasePlayerIdentity');
+  const reset = identity.slice(resetStart, releaseStart);
+  assert.match(reset, /if \(access\.is_test\)[\s\S]*DELETE FROM quick_start_claims/);
+  assert.doesNotMatch(reset.slice(0, reset.indexOf('if (access.is_test)')), /DELETE FROM quick_start_claims/);
+  assert.match(identity.slice(releaseStart), /DELETE FROM quick_start_claims/);
 });
 
 test('QR destination list adds Quick Start after preserving all five existing values', () => {

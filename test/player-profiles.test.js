@@ -302,10 +302,10 @@ test('profile backup CSV is authenticated, live-only, test-marked, private, and 
 });
 
 test('gameplay reset preserves profile, profile history, and prize history', async () => {
-  const server = await read('../server.js');
-  const start = server.indexOf("app.post('/api/admin/player/:accessCode/reset'");
-  const end = server.indexOf("app.put('/api/admin/player/:accessCode/visits'", start);
-  const reset = server.slice(start, end);
+  const identity = await read('../player-identity.js');
+  const start = identity.indexOf('export async function resetGameplay');
+  const end = identity.indexOf('export async function releasePlayerIdentity', start);
+  const reset = identity.slice(start, end);
   assert.doesNotMatch(reset, /DELETE FROM (?:player_profiles|player_profile_versions|prize_draws)/);
   assert.match(reset, /DELETE FROM visits/);
   assert.match(reset, /DELETE FROM video_answers/);
@@ -318,7 +318,7 @@ test('Mission Control exposes history, restore, backup, and explicit recovery wa
   assert.match(html, /RESTORE THIS VERSION/);
   assert.match(html, /DOWNLOAD PROFILE BACKUP CSV/);
   assert.match(html, /PROFILE CLEARED \/\/ RECOVERY COPY SAVED/);
-  assert.match(html, /PLAYER PROFILE AND PROFILE HISTORY WILL BE PRESERVED/);
+  assert.match(html, /DURABLE IDENTITY, RECOVERY CONTINUITY, PLAYER PROFILE, PROFILE HISTORY, AND PRIZE HISTORY WILL BE PRESERVED/);
   assert.match(html, /addEventListener\('click',\(\)=>restoreProfileVersion\(entry\)\)/);
 });
 

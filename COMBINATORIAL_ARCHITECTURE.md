@@ -414,7 +414,7 @@ Always-On and Event modes can coexist; player-specific context overlays either. 
 | Classification | Capability | Evidence / limitation |
 |---|---|---|
 | **CURRENT / proven foundation** | Node/Express/PostgreSQL | `package.json`, `server.js`, `db.js`, `schema.sql` |
-| **CURRENT** | Access codes, player cookies, QuickStart | `access_codes`, `players`, `quick_start_claims`; `quick-start.js`; `/api/access`, `/api/quick-start` |
+| **CURRENT** | Durable access-code ownership, player cookies, QuickStart | `access_codes.claimed_at`, `players`, `quick_start_claims`; `player-identity.js`; `quick-start.js`; `/api/access`, `/api/quick-start` |
 | **CURRENT** | Unique-name and profile-history foundation | `player_profiles`, generated normalized name in migration 001, `player-profiles.js` |
 | **PARTIAL** | Event/player-shell foundation | `events.js`, `/api/event`, `/player`, `player-shell.js`; only default event/current shell |
 | **CURRENT fixed workflow** | Four station routes and Start/End | route constants in `lib.js`; `/api/scan/:station`, `/api/start-end`; `public/station.html` |
@@ -504,6 +504,7 @@ Concrete current evidence includes:
 - `schema.sql`: identity, visits, responses, configuration, sessions, claims, profiles/history, prize draws, and audit tables.
 - `migrations/001_frnn_event_foundation.sql`: event table, default event, event-scoped foreign keys/indexes, normalized-name uniqueness.
 - `migrations/002_broadcast_master_clock.sql`: ordered Program persistence and singleton broadcast clock anchor.
+- `migrations/003_durable_player_identity.sql`: deterministic non-test player ownership backfill and never-owned allocation index.
 - `broadcast.js`: Program validation, authoritative state resolution, queue replacement, and explicit start/stop behavior.
 - `server.js`: `/healthz`, `/api/event`, `/api/me`, profile, access, scan/response/final, Start/End, Mission Control, profile/history, drawing, QR, config, Program, and Broadcast routes.
 - `quick-start.js`: idempotent token hashing and locked code allocation.

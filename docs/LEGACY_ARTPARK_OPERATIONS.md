@@ -92,15 +92,15 @@ It shows:
 
 ### Code lifecycle
 
-- **UNUSED**: a valid production code that has not yet been entered successfully by a player. Displaying, copying, printing, or handing out a code does not change this state.
+- **UNUSED**: an operationally unactivated production code. Normal allocation additionally requires `claimed_at IS NULL`, so a durably owned credential can never be treated as available merely because another lifecycle field is stale.
 - **ACTIVE**: successfully entered and representing a current player/group journey.
 - **COMPLETE**: active with all four unique digital station visits.
 
-The lifecycle is **UNUSED → ACTIVE → COMPLETE**. **RESET PROGRESS removes Active status and clears the digital route, four reflective choices, final response, and phrase-reveal eligibility. The code remains valid, retains the same persistent player/group identity, and can be activated again at a station, where it starts fresh at Stage 1.** Physical stamps are unaffected.
+Operational lifecycle is **UNUSED → ACTIVE → COMPLETE**, while durable ownership is independently **UNCLAIMED → CLAIMED**. **RESET GAMEPLAY clears the digital route, four reflective choices, final response, and phrase-reveal eligibility but preserves claimed ownership, active recovery continuity, player/profile/history, and prize history.** Only the separately confirmed privileged **DELETE PLAYER IDENTITY + RELEASE CREDENTIAL** action removes identity-owned state and clears ownership. Physical stamps are unaffected.
 
 Mission Control also provides `TEST-01` through `TEST-05`. Test codes use the real authorization, cookie, routing, recovery, and video behavior, but are excluded from production inventory, activity, station-scan, and completion metrics.
 
-The **Active Receivers** directory uses the same lifecycle definition as the Active Receivers counter: production codes with `status=active`. Completed routes remain active and receive a visible `COMPLETE` badge. Reset codes and test credentials do not appear. Results load 50 at a time, most-recent first by default, with code and progress sorting available.
+The **Active Receivers** directory uses the same lifecycle definition as the Active Receivers counter: production codes with `status=active`. Completed routes remain active and receive a visible `COMPLETE` badge. Gameplay-reset identities remain active with fresh progress because reset no longer releases ownership; test credentials do not appear. Results load 50 at a time, most-recent first by default, with code and progress sorting available.
 
 Video URL changes live in PostgreSQL, so changing them does not require new QR codes.
 
@@ -155,7 +155,7 @@ Mission Control persists twelve Functional role fields, three final-question rol
 
 The authenticated `/admin` dashboard generates six QRs: Start/End, Access, Attention, Escape, Sensory, and Quick Start / Auto-Issue. Every displayed URL, QR preview, PNG, and SVG derives from the same `PUBLIC_BASE_URL` value (falling back to the current request host only when it is not configured). Viewing or downloading from the generator does not change player or database state. Always verify the displayed hostname is the intended permanent print destination before mass printing.
 
-The Quick Start QR encodes only `/quick-start`; it never contains a player code. Deliberately opening it loads a zero-typing browser bridge, which shares an idempotency token across same-browser tabs and atomically claims one unallocated production `UNUSED` code. Matching near-simultaneous requests serialize through `quick_start_claims` and reuse that code. The server then activates the existing one-code/one-player identity, sets the normal persistent player cookie, and redirects to `/s/start-end`. A browser that already has a valid active player is redirected without consuming another code. Quick Start creates no Functional visit, so the first Functional scan remains discovery Stage 1. Automated preview/prefetch requests are rejected.
+The Quick Start QR encodes only `/quick-start`; it never contains a player code. Deliberately opening it loads a zero-typing browser bridge, which shares an idempotency token across same-browser tabs and atomically selects one unallocated, never-owned production `UNUSED` code. Matching near-simultaneous requests serialize through `quick_start_claims` and reuse that code. First activation records durable ownership; later gameplay reset preserves the same token-to-code continuity. A fresh browser can never receive that owned credential through QuickStart. The server sets the normal persistent player cookie and redirects to the player shell. Quick Start creates no Functional visit, so the first Functional scan remains discovery Stage 1. Automated preview/prefetch requests are rejected.
 
 Mission Control includes an operator-only Drawing Pool. Eligibility comes only from a persisted final reflection on a non-test code. Winner selection is server-side and auditable; no-repeat draws serialize transactionally, while the explicit repeat toggle permits prior winners. Prize history survives player resets, and CSV exports contain only code and completion metadata.
 
@@ -173,9 +173,10 @@ Install Docker Desktop, then from this folder:
 docker compose up --build
 ```
 
-In another terminal, import the included 2,500 codes:
+In another terminal, generate an ignored local credential inventory and import it:
 
 ```bash
+docker compose exec app npm run codes:generate -- 2500
 docker compose exec app npm run codes:import
 ```
 
@@ -187,7 +188,7 @@ Then open:
 
 The default passphrase is development-only and can be overridden by setting `MISSION_CONTROL_PASSPHRASE` in the operator environment before starting Compose. Production must supply a separate private value through production environment/configuration. `ADMIN_KEY=local-development-only` remains a separate server-maintenance credential and is not the Mission Control login.
 
-Use any code from `data/access_codes.csv`.
+Use a code from the ignored private `data/access_codes.local.csv`. Never commit that file.
 
 ## Non-Docker local setup
 
@@ -206,6 +207,7 @@ Then:
 
 ```bash
 npm install
+npm run codes:generate -- 2500
 npm run codes:import
 npm start
 ```
@@ -233,7 +235,7 @@ The `Dockerfile` is provider-neutral. The host does not need your concierge comp
 
 After the first deployment:
 
-1. run `npm run codes:import` once against the production database;
+1. run `npm run codes:import -- <private-credential-csv-path>` once against the production database;
 2. open `/admin` and set your video URLs;
 3. test all four station routes with several access codes;
 4. generate final QR art only after the permanent public domain is locked.
@@ -282,8 +284,9 @@ Keep the admin key and Mission Control passphrase private. Operators use only th
 - `config.default.json` — initial visual/content configuration
 - `public/station.html` — player mobile interface
 - `public/admin.html` — Mission Control, including the experimental Program Packager
-- `data/access_codes.csv` — included 2,500 field codes
-- `scripts/import-codes.js` — loads codes into PostgreSQL
+- `data/access_codes.example.csv` — header-only format example; not a usable inventory
+- `data/access_codes.local.csv` — ignored local/private inventory generated on demand
+- `scripts/import-codes.js` — loads an ignored local or explicitly supplied private CSV into PostgreSQL
 - `scripts/generate-qr.js` — generates final station QR files
 - `FIELD_OPERATIONS_QUICKSTART.md` — what you personally do at the festival
 - [`archive/DEPLOYMENT_HANDOFF_PRE_CURRENT_RUNTIME.md`](archive/DEPLOYMENT_HANDOFF_PRE_CURRENT_RUNTIME.md) — historical pre-current deployment handoff; not current implementation or deployment truth

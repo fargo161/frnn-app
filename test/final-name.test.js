@@ -180,10 +180,10 @@ test('gameplay reset preserves profile name and profile history', async () => {
 });
 
 test('after reset the deleted final completion locks every later final-name write', async () => {
-  const server = await read('../server.js');
-  const resetStart = server.indexOf("app.post('/api/admin/player/:accessCode/reset'");
-  const resetEnd = server.indexOf("app.put('/api/admin/player/:accessCode/visits'", resetStart);
-  assert.match(server.slice(resetStart, resetEnd), /DELETE FROM final_reflections WHERE code=\$1/);
+  const [server, identity] = await Promise.all([read('../server.js'), read('../player-identity.js')]);
+  const resetStart = identity.indexOf('export async function resetGameplay');
+  const resetEnd = identity.indexOf('export async function releasePlayerIdentity', resetStart);
+  assert.match(identity.slice(resetStart, resetEnd), /DELETE FROM final_reflections WHERE code=\$1/);
   assert.match(finalNameEndpoint(server), /if \(!completion\.rows\[0\]\) return \{ error: 'FINAL_COMPLETION_REQUIRED'/);
 });
 
