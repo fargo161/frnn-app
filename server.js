@@ -59,6 +59,7 @@ import {
   isPrefetchRequest
 } from './quick-start.js';
 import { normalizeAnswer, answerMatches } from './answer-matching.js';
+import { resolveNodeAssignment } from './node-assignments.js';
 import {
   lockAccessCode,
   ensurePlayerIdentity,
@@ -492,6 +493,24 @@ app.post('/api/scan/:station', async (req, res) => {
       if (!access) return { error: 'ACCESS_CODE_INVALID', status: 403 };
       if (!bodyCode && access.status !== 'active') return { error: 'ACCESS_REQUIRED', status: 401 };
       await ensurePlayerIdentity(client, code);
+
+      if (station === 'escape') {
+        const escapeConfig = await getContentConfig(client);
+        const resolution = await resolveNodeAssignment(client, {
+          code,
+          nodeKey: 'escape',
+          authoredDefault: escapeConfig.stations.escape?.subtitle
+            || escapeConfig.stations.escape?.label
+            || ''
+        });
+        if (resolution.source === 'assignment') {
+          return {
+            mode: 'assignment',
+            nodeKey: resolution.nodeKey,
+            assignedMessage: resolution.assignedMessage
+          };
+        }
+      }
 
       const existing = await client.query('SELECT station, stage, created_at FROM visits WHERE code=$1 AND station=$2', [code, station]);
       let stage;

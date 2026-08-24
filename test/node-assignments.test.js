@@ -165,7 +165,7 @@ test('invalid node is rejected before lookup and repeated resolution is determin
   assert.deepEqual(second, first);
 });
 
-test('resolver experiment leaves six QR destinations and route/UI integration unchanged', async () => {
+test('resolver integration remains Escape-only while six QR destinations and UI stay unchanged', async () => {
   assert.deepEqual(QR_DESTINATIONS.map(destination => destination.route), [
     '/s/start-end', '/s/access', '/s/attention', '/s/escape', '/s/sensory', '/quick-start'
   ]);
@@ -173,7 +173,12 @@ test('resolver experiment leaves six QR destinations and route/UI integration un
     read('../server.js'),
     read('../public/station.html')
   ]);
-  assert.doesNotMatch(server, /node-assignments|resolveNodeAssignment/);
+  assert.match(server, /import \{ resolveNodeAssignment \} from '\.\/node-assignments\.js'/);
+  const scanStart = server.indexOf("app.post('/api/scan/:station'");
+  const scanEnd = server.indexOf("app.post('/api/response/:station'", scanStart);
+  const scan = server.slice(scanStart, scanEnd);
+  assert.match(scan, /if \(station === 'escape'\) \{[\s\S]*resolveNodeAssignment/);
+  assert.doesNotMatch(scan, /station === '(?:attention|access|sensory)'[\s\S]*resolveNodeAssignment/);
   assert.match(server, /app\.post\('\/api\/scan\/:station'/);
   assert.match(station, /startEnd\?'\/api\/start-end':`\/api\/scan\/\$\{station\}`/);
 });
