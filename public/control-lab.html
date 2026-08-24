@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FRNN Broadcast Control Lab</title>
+  <link rel="stylesheet" href="/control-lab.css">
+  <script src="/control-lab.js" defer></script>
+</head>
+<body>
+  <main class="lab-shell">
+    <header class="lab-header">
+      <div>
+        <div class="eyebrow">FRNN // FOUNDATION EXPERIMENT 01</div>
+        <h1>Broadcast Control Lab</h1>
+        <p>Reusable Library → Upcoming Queue → immutable Active Run → public Broadcast</p>
+      </div>
+      <nav aria-label="Broadcast links">
+        <a href="/admin">Mission Control</a>
+        <a href="/broadcast" target="_blank" rel="noopener">Public Broadcast</a>
+      </nav>
+    </header>
+
+    <div id="sessionState" class="session-state" aria-live="polite">Checking Mission Control session…</div>
+    <section id="authRequired" class="panel hidden">
+      <h2>Mission Control sign-in required</h2>
+      <p>This producer surface uses the existing Mission Control session. Sign in there, then return here.</p>
+      <a class="button" href="/admin">Return to Mission Control sign-in</a>
+    </section>
+
+    <section id="lab" class="hidden">
+      <div class="transport-bar">
+        <div>
+          <span class="label">CHANNEL</span>
+          <strong id="nowStatus" class="off-air">OFF AIR</strong>
+        </div>
+        <div class="transport-actions">
+          <button id="refreshState" type="button">Refresh</button>
+          <button id="startBroadcast" type="button">Start</button>
+          <button id="stopBroadcast" type="button" class="danger">Stop</button>
+        </div>
+      </div>
+
+      <div id="message" class="message" aria-live="polite"></div>
+
+      <section class="panel now-panel" aria-labelledby="nowHeading">
+        <div class="panel-heading">
+          <div>
+            <span class="label">PERSISTED SNAPSHOT</span>
+            <h2 id="nowHeading">NOW</h2>
+          </div>
+        </div>
+        <dl id="nowDetails" class="now-details"></dl>
+      </section>
+
+      <div class="workspace-grid">
+        <section class="panel" aria-labelledby="libraryHeading">
+          <div class="panel-heading">
+            <div>
+              <span class="label">REUSABLE DEFINITIONS</span>
+              <h2 id="libraryHeading">Library</h2>
+            </div>
+          </div>
+
+          <form id="libraryForm" class="item-form">
+            <label>ID <input id="itemId" required maxlength="128" autocomplete="off"></label>
+            <label>Title <input id="itemTitle" required maxlength="200" autocomplete="off"></label>
+            <div class="two-column">
+              <label>Semantic kind
+                <select id="itemKind"><option value="PROGRAM">PROGRAM</option><option value="TRANSITION">TRANSITION</option></select>
+              </label>
+              <label>Playback type
+                <select id="playbackType"><option value="test_card">TEST CARD</option><option value="image">IMAGE</option><option value="video">VIDEO</option></select>
+              </label>
+            </div>
+            <label>Media reference <input id="mediaRef" placeholder="Optional for test cards" autocomplete="off"></label>
+            <label>Duration (milliseconds) <input id="durationMs" type="number" min="1" step="1" value="12000" required></label>
+            <label class="check"><input id="loopEligible" type="checkbox"> LOOP eligible (stored for later; no runtime effect in Task 01)</label>
+            <div class="form-actions">
+              <button id="saveItem" type="submit">Create library item</button>
+              <button id="cancelEdit" type="button" class="secondary hidden">Cancel edit</button>
+            </div>
+          </form>
+
+          <div id="libraryList" class="record-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="queueHeading">
+          <div class="panel-heading">
+            <div>
+              <span class="label">FUTURE ACTIVATIONS</span>
+              <h2 id="queueHeading">Upcoming Queue</h2>
+            </div>
+          </div>
+          <div class="queue-add">
+            <label for="queueSelect">Reusable item</label>
+            <select id="queueSelect"></select>
+            <button id="addQueue" type="button">Add reference</button>
+          </div>
+          <p class="hint">Duplicate references are allowed. Editing a Library item changes future activations, never the current run.</p>
+          <ol id="queueList" class="queue-list" aria-live="polite"></ol>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

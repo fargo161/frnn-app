@@ -144,6 +144,11 @@ These artifacts are related, but they are not interchangeable reality states. Ap
 9. Every packet is tied to a baseline commit.
 10. Packets remain bounded enough for one implementation pass whenever practical.
 
-## Draft intake
+## Implemented task packet
 
-- [Broadcast Control Lab Task Packet 01 — Library / Queue / Active Snapshot](BCL_TASK_PACKET_01_LIBRARY_QUEUE_SNAPSHOT_DRAFT.md) is tracked as `DRAFT_NEEDS_REVISION`. It is not an active work order until its visible intake note is resolved and a fresh baseline inspection authorizes execution.
+- [Broadcast Control Lab Task Packet 01 — Library / Queue / Active Snapshot](BCL_TASK_PACKET_01_LIBRARY_QUEUE_SNAPSHOT.md) is `IMPLEMENTED / LOCALLY TESTED` in the current uncommitted worktree. It is not deployed or broadly validated. The [original draft intake](BCL_TASK_PACKET_01_LIBRARY_QUEUE_SNAPSHOT_DRAFT.md) is retained as a supersession pointer.
+
+## Shared-file execution gate
+
+- `public/admin.html` is exclusive-write: only one active task/agent may own it. BCL Task Packet 01 and the pending Escape Mission Control authoring packet must be sequenced, never executed against that file concurrently. The Director records the current owner before edits and stops on unowned drift.
+- Current owner: **none**. BCL Task Packet 01 released the file after its final tests on 2026-08-24. The pending Escape packet remains Pending and must re-inspect the new Control Lab link/retired Packager state before acquiring ownership.

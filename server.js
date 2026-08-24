@@ -76,12 +76,19 @@ import {
 } from './mission-interface.js';
 import {
   isBroadcastError,
-  readBroadcastAdminState,
   readBroadcastState,
-  replaceBroadcastPrograms,
   startBroadcast,
   stopBroadcast
 } from './broadcast.js';
+import {
+  readControlLabState,
+  createPackagedItem,
+  updatePackagedItem,
+  deletePackagedItem,
+  addQueueEntry,
+  reorderQueueEntries,
+  removeQueueEntry
+} from './broadcast-control-lab.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -91,7 +98,7 @@ const MISSION_CONTROL_PASSPHRASE = process.env.MISSION_CONTROL_PASSPHRASE || '';
 const COOKIE_NAME = 'artpark_field_access';
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-if (!process.env.DATABASE_URL) {
+if (!process.env.DATABASE_URL && !(process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL)) {
   console.error('DATABASE_URL is required. See .env.example.');
   process.exit(1);
 }
@@ -177,7 +184,8 @@ async function audit(client, action, code, operator, detail = {}) {
 
 function sendBroadcastError(res, error) {
   if (!isBroadcastError(error)) return false;
-  const status = error.code === 'INVALID_PROGRAM_QUEUE' ? 400 : 409;
+  const status = error.code.startsWith('INVALID_') ? 400 :
+    error.code.endsWith('_NOT_FOUND') ? 404 : 409;
   const body = { error: error.code };
   if (error.details !== undefined) body.details = error.details;
   res.status(status).json(body);
@@ -429,7 +437,7 @@ app.get('/api/event', async (_req, res, next) => {
 app.get('/api/broadcast', async (_req, res, next) => {
   res.set('Cache-Control', 'no-store');
   try {
-    res.json(await readBroadcastState(pool));
+    res.json(await withTransaction(client => readBroadcastState(client)));
   } catch (error) {
     next(error);
   }
@@ -798,6 +806,10 @@ app.get('/broadcast', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'broadcast.html'));
 });
 
+app.get('/control-lab', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'control-lab.html'));
+});
+
 app.post('/api/mission-control/login', async (req, res) => {
   if (!MISSION_CONTROL_PASSPHRASE) return res.status(503).json({ error: 'MISSION_CONTROL_NOT_CONFIGURED' });
   if (!secureEqual(req.body?.passphrase, MISSION_CONTROL_PASSPHRASE)) {
@@ -825,25 +837,113 @@ app.post('/api/mission-control/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/programs', requireAdmin, async (_req, res, next) => {
+app.get('/api/admin/programs', requireAdmin, (_req, res) => {
+  res.status(409).json({ error: 'BROADCAST_LEGACY_PACKAGER_RETIRED' });
+});
+
+app.put('/api/admin/programs', requireAdmin, (_req, res) => {
+  res.status(409).json({ error: 'BROADCAST_LEGACY_PACKAGER_RETIRED' });
+});
+
+app.get('/api/admin/broadcast/control-lab', requireAdmin, async (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
   try {
-    res.json(await readBroadcastAdminState(pool));
+    res.json(await withTransaction(client => readControlLabState(client)));
   } catch (error) {
-    next(error);
+    if (!sendBroadcastError(res, error)) next(error);
   }
 });
 
-app.put('/api/admin/programs', requireAdmin, async (req, res, next) => {
+app.post('/api/admin/broadcast/library', requireAdmin, async (req, res, next) => {
   try {
-    const state = await withTransaction(async client => {
-      const result = await replaceBroadcastPrograms(client, req.body?.programs);
-      await audit(client, 'BROADCAST_PROGRAMS_REPLACED', null, req.missionOperator, {
-        programCount: result.programs.length,
-        programIds: result.programs.map(program => program.id)
+    const item = await withTransaction(async client => {
+      const result = await createPackagedItem(client, req.body);
+      await audit(client, 'BROADCAST_LIBRARY_CREATED', null, req.missionOperator, {
+        packagedItemId: result.id,
+        definitionVersion: result.definition_version
       });
       return result;
     });
-    res.json(state);
+    res.status(201).json({ item });
+  } catch (error) {
+    if (!sendBroadcastError(res, error)) next(error);
+  }
+});
+
+app.put('/api/admin/broadcast/library/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const item = await withTransaction(async client => {
+      const result = await updatePackagedItem(client, req.params.id, req.body);
+      await audit(client, 'BROADCAST_LIBRARY_EDITED', null, req.missionOperator, {
+        packagedItemId: result.id,
+        definitionVersion: result.definition_version
+      });
+      return result;
+    });
+    res.json({ item });
+  } catch (error) {
+    if (!sendBroadcastError(res, error)) next(error);
+  }
+});
+
+app.delete('/api/admin/broadcast/library/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const result = await withTransaction(async client => {
+      const deletion = await deletePackagedItem(client, req.params.id);
+      await audit(client, 'BROADCAST_LIBRARY_DELETED', null, req.missionOperator, {
+        packagedItemId: deletion.packaged_item_id
+      });
+      return deletion;
+    });
+    res.json(result);
+  } catch (error) {
+    if (!sendBroadcastError(res, error)) next(error);
+  }
+});
+
+app.post('/api/admin/broadcast/queue', requireAdmin, async (req, res, next) => {
+  try {
+    const entry = await withTransaction(async client => {
+      const result = await addQueueEntry(client, req.body?.packaged_item_id);
+      await audit(client, 'BROADCAST_QUEUE_ADDED', null, req.missionOperator, {
+        packagedItemId: result.packaged_item_id,
+        queueEntryId: result.id,
+        queuePosition: result.queue_position
+      });
+      return result;
+    });
+    res.status(201).json({ entry });
+  } catch (error) {
+    if (!sendBroadcastError(res, error)) next(error);
+  }
+});
+
+app.put('/api/admin/broadcast/queue/order', requireAdmin, async (req, res, next) => {
+  try {
+    const queue = await withTransaction(async client => {
+      const result = await reorderQueueEntries(client, req.body?.entry_ids);
+      await audit(client, 'BROADCAST_QUEUE_REORDERED', null, req.missionOperator, {
+        queueEntryIds: result.map(entry => entry.id)
+      });
+      return result;
+    });
+    res.json({ queue });
+  } catch (error) {
+    if (!sendBroadcastError(res, error)) next(error);
+  }
+});
+
+app.delete('/api/admin/broadcast/queue/:entryId', requireAdmin, async (req, res, next) => {
+  try {
+    const entry = await withTransaction(async client => {
+      const result = await removeQueueEntry(client, req.params.entryId);
+      await audit(client, 'BROADCAST_QUEUE_REMOVED', null, req.missionOperator, {
+        packagedItemId: result.packaged_item_id,
+        queueEntryId: result.id
+      });
+      return result;
+    });
+    res.json({ entry });
   } catch (error) {
     if (!sendBroadcastError(res, error)) next(error);
   }
@@ -854,9 +954,10 @@ app.post('/api/admin/broadcast/start', requireAdmin, async (req, res, next) => {
     const state = await withTransaction(async client => {
       const result = await startBroadcast(client);
       await audit(client, 'BROADCAST_STARTED', null, req.missionOperator, {
-        startedAt: result.started_at,
-        firstProgramId: result.programs[0].id,
-        programCount: result.programs.length
+        startedAt: result.active_run.started_at,
+        runId: result.active_run.run_id,
+        packagedItemId: result.active_run.packaged_item_id,
+        sourceQueueEntryId: result.active_run.source_queue_entry_id
       });
       return result;
     });
@@ -871,7 +972,8 @@ app.post('/api/admin/broadcast/stop', requireAdmin, async (req, res, next) => {
     const state = await withTransaction(async client => {
       const result = await stopBroadcast(client);
       await audit(client, 'BROADCAST_STOPPED', null, req.missionOperator, {
-        programCount: result.programs.length
+        stoppedRunId: result.stopped_run_id,
+        remainingQueueEntryIds: result.queue.map(entry => entry.id)
       });
       return result;
     });

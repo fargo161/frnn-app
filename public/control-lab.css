@@ -1,0 +1,91 @@
+:root {
+  color-scheme: dark;
+  --ink: #f4f4eb;
+  --muted: #a7aaa5;
+  --panel: #171a1c;
+  --line: #34393b;
+  --signal: #d7ff3f;
+  --danger: #ff5c46;
+  --surface: #0c0f10;
+  --blue: #67c7ff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+}
+
+button, input, select { font: inherit; }
+
+button, .button, nav a {
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  padding: .65rem .85rem;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  cursor: pointer;
+}
+
+button:hover, .button:hover, nav a:hover { background: var(--ink); color: var(--surface); }
+button:disabled { cursor: not-allowed; opacity: .35; }
+button.danger { border-color: var(--danger); color: var(--danger); }
+button.secondary { border-color: var(--muted); color: var(--muted); }
+
+.lab-shell { width: min(1480px, 100%); margin: 0 auto; padding: 1.25rem; }
+.lab-header { display: flex; justify-content: space-between; gap: 2rem; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 1rem; }
+.lab-header h1 { font-size: clamp(2rem, 5vw, 4.5rem); line-height: .9; margin: .35rem 0; text-transform: uppercase; }
+.lab-header p { color: var(--muted); margin: .75rem 0 0; }
+.lab-header nav { display: flex; flex-wrap: wrap; gap: .5rem; }
+.eyebrow, .label { color: var(--signal); font-size: .72rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+
+.session-state, .message { min-height: 2.5rem; padding: .75rem 0; color: var(--muted); }
+.message.error { color: var(--danger); }
+.message.success { color: var(--signal); }
+.hidden { display: none !important; }
+
+.panel, .transport-bar {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 1rem;
+}
+.transport-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-top: 4px solid var(--line); }
+.transport-actions, .record-actions, .form-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.on-air { color: var(--signal); }
+.off-air { color: var(--muted); }
+.panel-heading { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--line); margin-bottom: 1rem; }
+.panel h2 { margin: .2rem 0 .8rem; text-transform: uppercase; }
+.now-panel { margin-bottom: 1rem; }
+.now-details { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .75rem; margin: 0; }
+.now-details div { min-width: 0; }
+.now-details dt { color: var(--muted); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; }
+.now-details dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+
+.workspace-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); gap: 1rem; }
+.item-form { display: grid; gap: .75rem; border-bottom: 1px solid var(--line); padding-bottom: 1rem; margin-bottom: 1rem; }
+.item-form label, .queue-add label { display: grid; gap: .3rem; color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+.item-form label.check { display: flex; align-items: center; gap: .5rem; text-transform: none; letter-spacing: normal; }
+.two-column { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+input, select { width: 100%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: .65rem; }
+input:focus, select:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+.record-list, .queue-list { display: grid; gap: .65rem; padding: 0; }
+.record, .queue-list li { list-style: none; border-left: 3px solid var(--line); background: var(--surface); padding: .75rem; }
+.record-title { display: flex; justify-content: space-between; gap: .75rem; }
+.record-meta, .hint { color: var(--muted); font-size: .82rem; line-height: 1.45; }
+.record-actions { margin-top: .7rem; }
+.record-actions button { padding: .42rem .55rem; font-size: .75rem; }
+.queue-add { display: grid; grid-template-columns: 1fr auto; gap: .5rem; align-items: end; }
+.queue-add label { grid-column: 1 / -1; }
+.empty { color: var(--muted); padding: 1rem 0; }
+
+@media (max-width: 900px) {
+  .lab-header, .transport-bar { align-items: stretch; flex-direction: column; }
+  .workspace-grid { grid-template-columns: 1fr; }
+  .now-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

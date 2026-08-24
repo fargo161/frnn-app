@@ -9,6 +9,8 @@
 
 > This packet defines work requested from the stated baseline. Current source, runtime behavior, and behavioral tests remain authoritative for what is actually implemented.
 
+> **EXCLUSIVE FILE GATE — `public/admin.html`:** This packet may modify `public/admin.html` only when it is the single active owner of that file. Broadcast Control Lab Task Packet 01 also claims a bounded edit there and must remain inactive while this packet owns it. Before work, verify the file is clean and record this packet as owner; if any unowned or concurrent change appears, stop rather than silently reconciling it.
+
 ## PRIMARY OBJECTIVE
 
 Add the smallest Mission Control control required to select one existing durable player and SET or CLEAR that player's Escape `assigned_message` through the already-implemented authenticated server endpoints.

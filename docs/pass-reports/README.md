@@ -21,3 +21,8 @@
 | 2026-08-24 16:52 | Broadcast Control Lab locked-design/current-reality audit | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1652_broadcast-control-lab-reality-audit.md) |
 | 2026-08-24 17:08 | Broadcast packaging/media and QR-mission integration brainstorm | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1708_broadcast-qr-integration-brainstorm.md) |
 | 2026-08-24 17:20 | Publish Broadcast Control Lab design baseline | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1720_publish-bcl-design-baseline.md) |
+| 2026-08-24 17:40 | Broadcast Control Lab Task Packet 01 Director repair | NOT COMMITTED | [Report](2026-08-24_1740_bcl-task-packet-01-director-repair.md) |
+| 2026-08-24 18:11 | BCL disposable PostgreSQL and exclusive admin-file gates | NOT COMMITTED | [Report](2026-08-24_1811_bcl-test-database-admin-file-gates.md) |
+| 2026-08-24 18:51 | BCL Library / Queue / immutable Active Run implementation | NOT COMMITTED | [Report](2026-08-24_1851_bcl-library-queue-active-run.md) |
+| 2026-08-24 19:32 | BCL two-receiver restart and natural-boundary rehearsal | NOT COMMITTED | [Report](2026-08-24_1932_bcl-two-receiver-restart-rehearsal.md) |
+| 2026-08-24 19:39 | Commit exact BCL Task 01 state | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1939_commit-bcl-task-01.md) |
