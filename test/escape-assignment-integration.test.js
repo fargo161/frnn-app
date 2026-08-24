@@ -85,7 +85,8 @@ test('Escape resolver call is after identity establishment and before visit muta
   assert.equal((route.match(/resolveNodeAssignment/g) || []).length, 1);
   assert.match(route, /authoredDefault: escapeConfig\.stations\.escape\?\.subtitle/);
   assert.match(stationUi, /renderStation\(data,false\)/);
-  assert.doesNotMatch(stationUi, /mode==='assignment'|mode === 'assignment'/);
+  assert.match(stationUi, /if\(data\.mode==='assignment'\)\{renderAssignment\(data\);return\}/);
+  assert.match(stationUi, /function renderAssignment\(data\)/);
   assert.doesNotMatch(quickStart, /resolveNodeAssignment|node_assignments/);
   assert.doesNotMatch(qrRouting, /resolveNodeAssignment|node_assignments/);
 });

@@ -14,3 +14,4 @@
 | 2026-08-24 11:56 | Single-escape read-integration Director pass | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1156_escape-read-integration-director.md) |
 | 2026-08-24 12:12 | Single-escape read-integration experiment | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1212_escape-read-integration.md) |
 | 2026-08-24 12:28 | Escape assigned-mode renderer Director pass | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1228_escape-assigned-renderer-director.md) |
+| 2026-08-24 12:37 | Escape assigned-mode station-page renderer | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1237_escape-assigned-renderer.md) |
