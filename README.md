@@ -178,11 +178,14 @@ The complete inherited setup, field workflow, QR, recovery, and production check
 
 | Document | Authority and purpose |
 |---|---|
-| `README.md` | Canonical current FRNN project orientation |
+| Source and runtime behavior | Authoritative for what is currently implemented |
+| `README.md` | Current FRNN project orientation |
 | [`COMBINATORIAL_ARCHITECTURE.md`](COMBINATORIAL_ARCHITECTURE.md) | Architectural law, module ownership, grammar, and invariants |
-| [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) | GitHub/Render/PostgreSQL/R2 relationships and operational boundaries |
-| [`docs/LEGACY_ARTPARK_OPERATIONS.md`](docs/LEGACY_ARTPARK_OPERATIONS.md) | Proven inherited quest subsystem and detailed field operations |
-| Source files | Current implementation truth |
+| [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) | Current infrastructure, deployment relationships, and operational boundaries |
+| [`docs/LEGACY_ARTPARK_OPERATIONS.md`](docs/LEGACY_ARTPARK_OPERATIONS.md) | Historical and event-specific operational reference; not canonical FRNN architecture |
+| [`tasks/`](tasks/README.md) | Bounded implementation instructions tied to repository baselines; task packets describe intended work and are not evidence of implementation |
+
+The [task packet protocol](tasks/README.md) defines packet headers, baseline checks, history preservation, implementation reports, and behavioral evidence expectations.
 
 ## Implementation reality
 
@@ -197,4 +200,5 @@ Future agents must distinguish authority from reading order:
 4. docs/INFRASTRUCTURE.md         → infrastructure truth / production boundaries
 5. docs/LEGACY_ARTPARK_OPERATIONS.md
                                   → inherited operational subsystem
+6. tasks/                         → bounded work instructions, not implementation evidence
 ```
