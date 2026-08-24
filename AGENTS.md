@@ -222,37 +222,34 @@ Do not perform broad architectural cleanup during a feature pass unless the task
 
 ---
 
-## 11. Implementation Reports
+## 11. Mandatory Post-Pass Reports
 
-At the end of an implementation pass, report:
+After every meaningful design, implementation, repair, refactor, stabilization, or documentation pass, create a standalone Markdown audit report. This is mandatory even when the pass fails, is incomplete, or makes no code changes.
 
-### WHAT WAS REAL BEFORE
-Relevant behavior confirmed in the source before modification.
+Save reports under `docs/pass-reports/` with the filename:
 
-### WHAT CHANGED
-Exact behavior introduced, removed, or modified.
+`YYYY-MM-DD_HHMM_<short-pass-name>.md`
 
-### FILES CHANGED
-Important files and their purpose.
+Do not overwrite an earlier report. Maintain `docs/pass-reports/README.md` as a chronological index containing only the date, pass name, commit, and report link.
 
-### BEHAVIORAL PATH
-Describe:
+Every report must contain these sections:
 
-**player action → recorded state → rule → state change → observable result**
+1. `PASS` — task name, objective, branch if applicable, and relevant commit SHA if one exists.
+2. `CURRENT REALITY BEFORE PASS` — what actually existed, using SPECULATIVE, DESIGNED, IMPLEMENTED, TESTED, and VALIDATED precisely.
+3. `WHAT CHANGED` — actual file, code-surface, state, and user-visible changes, described causally where relevant.
+4. `WHAT IS REAL NOW` — behavior actually present in current source after the pass.
+5. `WHAT IS STILL MISSING` — unmet objective requirements and partial implementations.
+6. `WHAT IS FAKE, PLACEHOLDER, OR PROVISIONAL` — mocks, temporary UI, hard-coded values, fake integrations, stubs, placeholder persistence, simulations, and authored shortcuts presented as systemic behavior. If none, write `None identified in this pass.`
+7. `TESTING PERFORMED` — exact structural and behavioral checks, kept separate, with commands when useful.
+8. `TEST RESULTS` — passes, failures, untested behavior, and environmental limitations.
+9. `IMPORTANT UNCERTAINTIES` — the most important remaining unknowns about behavior and causality.
+10. `RECOMMENDED NEXT EXPERIMENT` — the smallest experiment resolving the largest uncertainty, using `current claim → biggest uncertainty → minimum experiment → observable result` and NOW/NEXT/LATER/PARK when useful.
+11. `FILES MODIFIED` — every file created, modified, moved, or deleted during the pass.
+12. `COMMIT STATUS` — exactly one of `NOT COMMITTED`, `COMMITTED LOCALLY`, `PUSHED`, or `MERGED`, with SHA when available.
 
-### TESTS RUN
-State what was actually executed and what each meaningful test demonstrates.
+The report is an audit artifact, not promotional documentation. Never silently convert intended design into an implementation claim or hide failures, unfinished work, shortcuts, or contradictions. Do not use claims such as complete, robust, production-ready, fully implemented, validated, or emergent unless the pass contains supporting evidence.
 
-### WHAT REMAINS UNVERIFIED
-Anything that was not meaningfully exercised.
-
-### CONTRADICTIONS / PROVISIONAL ELEMENTS
-Mocks, placeholders, inert fields, temporary logic, documentation mismatches, or other misleading surfaces.
-
-### NEXT EXPERIMENT
-Recommend the smallest experiment that would resolve the largest remaining uncertainty.
-
-Do not describe a feature as validated merely because its implementation task succeeded.
+In the final chat response, summarize what actually changed, tests run, remaining uncertainty, and link to the standalone report. Do not describe a feature as validated merely because its implementation task succeeded.
 
 ---
 
