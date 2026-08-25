@@ -13,6 +13,7 @@ This directory tracks the owner-locked Broadcast Control Lab design context. The
 
 - Reinspect current `frnn-app` source before using any historical reality statement.
 - Treat task packets as bounded work orders, not implementation evidence.
-- [Task Packet 01](../../tasks/BCL_TASK_PACKET_01_LIBRARY_QUEUE_SNAPSHOT.md) is implemented and locally tested in the current uncommitted worktree. This establishes the bounded Library → Queue → immutable Active Run experiment; it does not implement the full locked Broadcast Control Lab or prove deployment/field behavior. Its [original draft intake](../../tasks/BCL_TASK_PACKET_01_LIBRARY_QUEUE_SNAPSHOT_DRAFT.md) is retained as a supersession pointer.
+- [Task Packet 01](../../tasks/BCL_TASK_PACKET_01_LIBRARY_QUEUE_SNAPSHOT.md) is implemented and locally tested in current source, with its exact pass committed at `e81c886fdc85985474c2f696265f5948968402bf`. This establishes the bounded Library → Queue → immutable Active Run experiment; it does not implement the full locked Broadcast Control Lab or prove deployment/field behavior. Its [original draft intake](../../tasks/BCL_TASK_PACKET_01_LIBRARY_QUEUE_SNAPSHOT_DRAFT.md) is retained as a supersession pointer.
+- [Web Test Lab owner guide](WEB_TEST_LAB.md) describes the explicit local launch path and laptop/phone rehearsal around that existing behavior.
 - The initial source/design reconciliation is recorded in the [Broadcast Control Lab reality audit](../pass-reports/2026-08-24_1652_broadcast-control-lab-reality-audit.md).
 - Implementation evidence and remaining limits are recorded in the [Task Packet 01 implementation report](../pass-reports/2026-08-24_1851_bcl-library-queue-active-run.md).

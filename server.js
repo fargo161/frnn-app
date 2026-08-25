@@ -89,12 +89,29 @@ import {
   reorderQueueEntries,
   removeQueueEntry
 } from './broadcast-control-lab.js';
+import {
+  createTestLabUrls,
+  discoverLanIpv4Addresses,
+  parseListenHost,
+  parsePort,
+  reachableLanIpv4Addresses,
+  testLabReadyMessage,
+  testLabStartupFailure
+} from './web-test-lab-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = Number(process.env.PORT || 3000);
+const PORT = parsePort(process.env.PORT);
+const HOST = parseListenHost(process.env.HOST);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const MISSION_CONTROL_PASSPHRASE = process.env.MISSION_CONTROL_PASSPHRASE || '';
+const TEST_LAB_ENABLED = String(process.env.FRNN_TEST_LAB || '').toLowerCase() === 'true';
+const TEST_LAB_LAN_ADDRESSES = TEST_LAB_ENABLED
+  ? reachableLanIpv4Addresses(HOST, discoverLanIpv4Addresses())
+  : [];
+const TEST_LAB_URLS = TEST_LAB_ENABLED
+  ? createTestLabUrls({ port: PORT, lanAddresses: TEST_LAB_LAN_ADDRESSES })
+  : null;
 const COOKIE_NAME = 'artpark_field_access';
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -810,6 +827,51 @@ app.get('/control-lab', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'control-lab.html'));
 });
 
+if (TEST_LAB_ENABLED) {
+  app.get('/test-lab', (_req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'test-lab.html'));
+  });
+
+  app.get('/api/test-lab/status', async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const broadcast = await withTransaction(client => readBroadcastState(client));
+      res.json({
+        identity: 'FRNN Web Test Lab',
+        environment: 'development',
+        server: 'ready',
+        database: 'ready',
+        listen: { host: HOST, port: PORT },
+        urls: TEST_LAB_URLS,
+        broadcast
+      });
+    } catch (_error) {
+      res.status(503).json({
+        identity: 'FRNN Web Test Lab',
+        environment: 'development',
+        server: 'ready',
+        database: 'unavailable',
+        error: 'TEST_LAB_DATABASE_UNAVAILABLE'
+      });
+    }
+  });
+
+  app.get('/api/test-lab/receiver-qr.svg', async (_req, res, next) => {
+    if (!TEST_LAB_URLS.primary_lan_broadcast) {
+      return res.status(404).json({ error: 'TEST_LAB_LAN_ADDRESS_UNAVAILABLE' });
+    }
+    try {
+      const svg = await QRCode.toString(TEST_LAB_URLS.primary_lan_broadcast, {
+        type: 'svg', margin: 2, errorCorrectionLevel: 'M', width: 480
+      });
+      res.set({ 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' });
+      res.send(svg);
+    } catch (error) {
+      next(error);
+    }
+  });
+}
+
 app.post('/api/mission-control/login', async (req, res) => {
   if (!MISSION_CONTROL_PASSPHRASE) return res.status(503).json({ error: 'MISSION_CONTROL_NOT_CONFIGURED' });
   if (!secureEqual(req.body?.passphrase, MISSION_CONTROL_PASSPHRASE)) {
@@ -1511,16 +1573,49 @@ app.put('/api/admin/config', requireAdmin, async (req, res) => {
   res.json(merged);
 });
 
+let httpServer = null;
+let shuttingDown = false;
+
 async function start() {
   await migrate();
   await getContentConfig();
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ARTPARK cloud router v2 running on port ${PORT}`);
+  await new Promise((resolve, reject) => {
+    httpServer = app.listen(PORT, HOST);
+    httpServer.once('error', reject);
+    httpServer.once('listening', resolve);
   });
+  if (TEST_LAB_ENABLED) {
+    console.log(testLabReadyMessage({ port: PORT, host: HOST, lanAddresses: TEST_LAB_LAN_ADDRESSES }));
+  } else {
+    console.log(`ARTPARK cloud router v2 running on ${HOST}:${PORT}`);
+  }
 }
 
-start().catch(error => {
-  console.error(error);
-  process.exit(1);
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  if (TEST_LAB_ENABLED) console.log(`\nStopping FRNN Test Lab (${signal})…`);
+  try {
+    if (httpServer?.listening) {
+      await new Promise((resolve, reject) => {
+        httpServer.close(error => error ? reject(error) : resolve());
+        httpServer.closeIdleConnections?.();
+      });
+    }
+    await pool.end();
+    if (TEST_LAB_ENABLED) console.log('FRNN Test Lab stopped. Local PostgreSQL data was retained.');
+  } catch (error) {
+    console.error(`FRNN shutdown warning: ${error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+process.once('SIGINT', () => void shutdown('Ctrl+C'));
+process.once('SIGTERM', () => void shutdown('termination signal'));
+
+start().catch(async error => {
+  console.error(TEST_LAB_ENABLED ? testLabStartupFailure(error, { port: PORT }) : error);
+  await pool.end().catch(() => {});
+  process.exitCode = 1;
 });
 

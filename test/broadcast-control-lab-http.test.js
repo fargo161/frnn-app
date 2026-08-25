@@ -48,10 +48,18 @@ async function waitForHealth(baseUrl, child, output) {
 async function stopChild(child) {
   if (!child || child.exitCode !== null) return;
   child.kill();
-  await Promise.race([
-    new Promise(resolve => child.once('exit', resolve)),
-    new Promise(resolve => setTimeout(resolve, 3_000))
-  ]);
+  const result = await waitForExit(child, 3_000);
+  assert.notEqual(result, 'timeout', 'Test Lab must stop cleanly after the normal termination signal');
+}
+
+function waitForExit(child, timeoutMs) {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve('timeout'), timeoutMs);
+    child.once('exit', code => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
 }
 
 async function request(baseUrl, path, { method = 'GET', body, authenticated = true } = {}) {
@@ -86,10 +94,12 @@ test('real authenticated HTTP path projects immutable v1, future v2, refusal det
     Object.assign(childEnvironment, {
       TEST_DATABASE_URL: isolatedUrl,
       PORT: String(port),
+      HOST: '0.0.0.0',
       NODE_ENV: 'test',
-      ADMIN_KEY: 'bcl-http-test-only'
+      ADMIN_KEY: 'bcl-http-test-only',
+      MISSION_CONTROL_PASSPHRASE: 'bcl-passphrase-test-only'
     });
-    child = spawn(process.execPath, [fileURLToPath(new URL('../server.js', import.meta.url))], {
+    child = spawn(process.execPath, [fileURLToPath(new URL('../scripts/start-test-lab.js', import.meta.url))], {
       cwd: fileURLToPath(new URL('..', import.meta.url)),
       env: childEnvironment,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -99,9 +109,42 @@ test('real authenticated HTTP path projects immutable v1, future v2, refusal det
     await waitForHealth(baseUrl, child, () => `${stdout}\n${stderr}`);
     isolatedPool = new Pool({ connectionString: isolatedUrl });
 
+    let conflictStdout = '';
+    let conflictStderr = '';
+    const conflict = spawn(process.execPath, [fileURLToPath(new URL('../scripts/start-test-lab.js', import.meta.url))], {
+      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      env: childEnvironment,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    conflict.stdout.on('data', chunk => { conflictStdout += chunk; });
+    conflict.stderr.on('data', chunk => { conflictStderr += chunk; });
+    const conflictExit = await waitForExit(conflict, 15_000);
+    assert.equal(conflictExit, 1);
+    assert.match(conflictStderr, new RegExp(`Port ${port} is already in use`));
+    assert.doesNotMatch(`${conflictStdout}\n${conflictStderr}`, /bcl-http-test-only|bcl-passphrase-test-only/);
+    assert.doesNotMatch(`${conflictStdout}\n${conflictStderr}`, new RegExp(schemaName));
+
     const controlPage = await fetch(`${baseUrl}/control-lab`);
     assert.equal(controlPage.status, 200);
     assert.match(await controlPage.text(), /Reusable Library/);
+    const testLabPage = await fetch(`${baseUrl}/test-lab`);
+    assert.equal(testLabPage.status, 200);
+    assert.match(await testLabPage.text(), /FRNN \/\/ DEVELOPMENT SURFACE/);
+    const testLabStatus = await request(baseUrl, '/api/test-lab/status', { authenticated: false });
+    assert.equal(testLabStatus.response.status, 200);
+    assert.equal(testLabStatus.body.server, 'ready');
+    assert.equal(testLabStatus.body.database, 'ready');
+    assert.deepEqual(testLabStatus.body.listen, { host: '0.0.0.0', port });
+    assert.equal(testLabStatus.body.urls.local_broadcast, `http://localhost:${port}/broadcast`);
+    assert.equal(testLabStatus.body.broadcast.status, 'off_air');
+    const qr = await fetch(`${baseUrl}/api/test-lab/receiver-qr.svg`);
+    if (testLabStatus.body.urls.lan_broadcasts.length) {
+      assert.equal(qr.status, 200);
+      assert.match(qr.headers.get('content-type'), /image\/svg\+xml/);
+      assert.match(await qr.text(), /<svg/);
+    } else {
+      assert.equal(qr.status, 404);
+    }
     const unauthenticated = await request(baseUrl, '/api/admin/broadcast/control-lab', { authenticated: false });
     assert.equal(unauthenticated.response.status, 401);
     assert.equal(unauthenticated.body.error, 'MISSION_CONTROL_ACCESS_REQUIRED');
@@ -181,6 +224,12 @@ test('real authenticated HTTP path projects immutable v1, future v2, refusal det
       'BROADCAST_STARTED'
     ]);
     assert.equal(audits.rows.some(row => row.action === 'BROADCAST_LIBRARY_DELETED'), false);
+    assert.match(stdout, /FRNN Test Lab ready/);
+    assert.match(stdout, new RegExp(`http://localhost:${port}/test-lab`));
+    assert.doesNotMatch(`${stdout}\n${stderr}`, /bcl-http-test-only|bcl-passphrase-test-only/);
+    assert.doesNotMatch(`${stdout}\n${stderr}`, new RegExp(schemaName));
+    await stopChild(child);
+    child = null;
   } finally {
     await stopChild(child);
     if (isolatedPool) await isolatedPool.end();

@@ -41,9 +41,9 @@ The following behaviors are present in the current source on `main`. This is a c
 - **CURRENT:** four physical quest routes—`/s/escape`, `/s/attention`, `/s/access`, `/s/sensory`—plus `/s/start-end`.
 - **CURRENT:** fixed station visit, reflective response, final-reflection, and completion behavior (`visits`, `video_answers`, `final_reflections`, `public/station.html`).
 - **CURRENT base:** Mission Control at `/admin`, including shared-passphrase sessions, operational controls, audit records, profiles/history, Drawing Pool, and QR generation (`public/admin.html`, `/api/admin/*`).
-- **CURRENT:** numbered migration foundation (`schema_migrations`; `migrations/001_frnn_event_foundation.sql`, `002_broadcast_master_clock.sql`, `003_durable_player_identity.sql`).
+- **CURRENT:** numbered migration foundation (`schema_migrations`; migrations `001` through `005`, including durable identity, node assignments, and the Broadcast Control Lab foundation).
 - **PARTIAL:** R2/S3-compatible media-storage adapter boundary with bounded listing and public-URL construction (`media-storage.js`); there is no upload pipeline yet.
-- **CURRENT / EXPERIMENTAL:** one global looping Program queue, PostgreSQL-authoritative master-clock anchor, bare Mission Control Packager, public `/api/broadcast` state, and minimal `/broadcast` viewer (`broadcast.js`, `migrations/002_broadcast_master_clock.sql`, `public/broadcast.html`). This is a bounded shared-clock experiment, not a production broadcast system.
+- **CURRENT / EXPERIMENTAL:** reusable Broadcast Library definitions, duplicate Queue references, one immutable copied Active Run, finite OFF AIR exhaustion, public `/api/broadcast` state, and a minimal `/broadcast` viewer (`broadcast-control-lab.js`, `broadcast.js`, `migrations/005_broadcast_control_lab_foundation.sql`, `public/control-lab.html`, `public/broadcast.html`). LOOP eligibility is persisted but causally inert. This is a bounded shared-clock experiment, not a production broadcast system.
 
 Broadcast v0.1 was introduced in `9087b534591a3025308f38f43368d6537b4a66cd`; that SHA is historical provenance only.
 
@@ -115,6 +115,8 @@ The complete rule set is in [`COMBINATORIAL_ARCHITECTURE.md`](COMBINATORIAL_ARCH
 |---|---|
 | `/quick-start` | Zero-typing bridge that atomically claims/reuses a production access code and enters Start/End |
 | `/player` | Early persistent player shell with owner-scoped profile and fixed quest progress |
+| `/test-lab` | Local-only owner hub when started with `npm run test-lab`; real Control Lab, public preview, LAN URL, and receiver QR |
+| `/control-lab` | Authenticated experimental Broadcast Library → Queue → Active Run operator surface |
 | `/broadcast` | Minimal public viewer for the one global authoritative Program timeline |
 | `/s/start-end` | Access-code entry plus opening/final framing and final reflection |
 | `/s/escape` | Physical quest station |
@@ -126,7 +128,7 @@ The physical route is a proven subsystem, not the definition of every future FRN
 
 ## Current Mission Control
 
-`/admin` is the existing operator surface and contains the experimental Broadcast Program Packager. It uses a shared `MISSION_CONTROL_PASSPHRASE` to create a secure, server-validated session and currently supports Program queue save/start/stop controls, code operations, route inspection/repair, gameplay reset, an explicitly confirmed identity-release control, content/video configuration, test codes, profiles/history, Drawing Pool, QR generation, and operational metrics. Gameplay reset preserves durable ownership and recovery continuity; only the separate destructive release returns a credential to unowned inventory.
+`/admin` is the existing Mission Control surface and links to the dedicated experimental `/control-lab`. A shared `MISSION_CONTROL_PASSPHRASE` creates a secure, server-validated session used by Broadcast producer operations and the other Mission Control tools. The public `/broadcast` receiver remains read-only. Gameplay reset preserves durable ownership and recovery continuity; only the separate destructive release returns a credential to unowned inventory.
 
 Master/Producer accounts, individual capability grants, drafts, approval, publication, and broadcast activation are **PLANNED / TARGET DESIGN**. The existing admin gate must not be mistaken for that future permission system.
 
@@ -145,6 +147,12 @@ media-storage boundary: Cloudflare R2
 PostgreSQL owns authoritative state and media metadata. Object storage owns media bytes. Render's local filesystem is not durable media storage. Never commit or document live credentials.
 
 ## Running locally
+
+For the owner-oriented Broadcast launch flow, use the dedicated [FRNN Web Test Lab guide](docs/broadcast-control-lab/WEB_TEST_LAB.md). After its one-time PostgreSQL and `.env.test-lab` setup, the canonical command is:
+
+```bash
+npm run test-lab
+```
 
 ### Docker
 
@@ -188,17 +196,11 @@ npm start
 
 `PUBLIC_BASE_URL` is required for authoritative QR destinations in deployed/print workflows. R2 variables are required only when using `media-storage.js`; see [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md). Do not point tests at production PostgreSQL.
 
-### Local Program Packager + Broadcast walkthrough
+### Local Broadcast Control Lab walkthrough
 
-After starting either local setup with `MISSION_CONTROL_PASSPHRASE` configured (or using Docker's development-only default):
+Run `npm run test-lab`, open the exact `/test-lab` URL printed in the terminal, sign in through the existing Mission Control path, and use the embedded `/control-lab` Library → Queue → Active Run flow. The same hub displays and previews the public `/broadcast` receiver plus a same-Wi-Fi phone URL/QR when a private LAN address is discoverable. See the [owner guide](docs/broadcast-control-lab/WEB_TEST_LAB.md) for the exact smoke test and limits.
 
-1. Open `http://localhost:3000/admin`, sign in with that passphrase, and find **Broadcast Program Packager** at the top of Mission Control.
-2. Open `http://localhost:3000/broadcast` in a separate tab, window, or browser. This is the public viewer/channel surface.
-3. While the channel is off air, edit the bounded Program queue and select **SAVE PROGRAM QUEUE**.
-4. Select **START BROADCAST**. The viewer reads `/api/broadcast` and follows the PostgreSQL-authoritative shared clock and ordered Program state.
-5. Select **STOP BROADCAST** in Mission Control to return the viewer to its explicit off-air state.
-
-Broadcast v0.1 is **CURRENT / EXPERIMENTAL**. It is one looping global queue and a minimal viewer, not production streaming infrastructure, a media library, YouTube integration, or a breaking-news system.
+This Broadcast foundation is **CURRENT / EXPERIMENTAL**. It is finite rather than looping and is not production streaming infrastructure, a Media Bin, the full Packaging Editor, YouTube integration, or a breaking-news system.
 
 The complete inherited setup, field workflow, QR, recovery, and production checklist is in [`docs/LEGACY_ARTPARK_OPERATIONS.md`](docs/LEGACY_ARTPARK_OPERATIONS.md).
 

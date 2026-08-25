@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "test-lab": "node scripts/start-test-lab.js",
     "dev": "node --watch server.js",
     "test": "node --test",
     "qr": "node scripts/generate-qr.js",

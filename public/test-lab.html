@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>FRNN Web Test Lab</title>
+  <link rel="stylesheet" href="/test-lab.css">
+  <script src="/web-test-lab.js" defer></script>
+</head>
+<body>
+  <main class="test-lab-shell">
+    <header class="masthead">
+      <div>
+        <div class="eyebrow">FRNN // DEVELOPMENT SURFACE</div>
+        <h1>Web Test Lab</h1>
+        <p class="network-name">Fried Rice News Network</p>
+      </div>
+      <div class="status-cluster" aria-label="Test Lab status">
+        <div class="status-cell">
+          <span>SERVER</span>
+          <strong id="serverState" class="checking">CHECKING</strong>
+        </div>
+        <div class="status-cell">
+          <span>DATABASE</span>
+          <strong id="databaseState" class="checking">CHECKING</strong>
+        </div>
+        <div class="status-cell">
+          <span>BROADCAST</span>
+          <strong id="broadcastState" class="checking">CHECKING</strong>
+        </div>
+      </div>
+    </header>
+
+    <div id="statusMessage" class="status-message" role="status" aria-live="polite">
+      Reading the real public Broadcast state…
+    </div>
+
+    <section class="receiver-card" aria-labelledby="receiverHeading">
+      <div class="receiver-copy">
+        <span class="section-label">DEVICE B // PUBLIC, READ-ONLY RECEIVER</span>
+        <h2 id="receiverHeading">Phone receiver</h2>
+        <p>Keep this laptop and your phone on the same trusted Wi-Fi. Open a displayed LAN address or scan the QR code.</p>
+
+        <div class="url-group">
+          <span class="url-label">LAPTOP BROADCAST</span>
+          <div class="url-line">
+            <a id="localBroadcastUrl" href="/broadcast" target="_blank" rel="noopener">Loading local address…</a>
+            <button type="button" class="copy-button" data-copy-target="localBroadcastUrl">Copy</button>
+          </div>
+        </div>
+
+        <div class="url-group">
+          <span class="url-label">PHONE / LAN BROADCAST</span>
+          <div id="lanBroadcastUrls" class="lan-urls" aria-live="polite">Discovering a private LAN address…</div>
+        </div>
+
+        <ol class="instructions">
+          <li>Keep this laptop and your phone on the same Wi-Fi.</li>
+          <li>Open the Broadcast URL on your phone or scan the QR code.</li>
+          <li>Use Control Lab on this laptop.</li>
+          <li>Start an item and confirm the phone and preview change.</li>
+        </ol>
+      </div>
+
+      <div id="qrPanel" class="qr-panel hidden">
+        <img id="receiverQr" alt="QR code for the primary phone Broadcast URL">
+        <div class="qr-caption">
+          <span>OPERATIONAL RECEIVER QR</span>
+          <strong id="qrTarget"></strong>
+          <small>This opens <code>/broadcast</code>. It is not a mission or station QR.</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="now-strip" aria-labelledby="nowHeading">
+      <div>
+        <span class="section-label">AUTHORITATIVE PUBLIC STATE</span>
+        <h2 id="nowHeading">Now</h2>
+      </div>
+      <dl>
+        <div><dt>TITLE</dt><dd id="activeTitle">CHANNEL STANDBY</dd></div>
+        <div><dt>ITEM ID</dt><dd id="activeItemId">—</dd></div>
+        <div><dt>PLAYBACK</dt><dd id="activePlayback">—</dd></div>
+        <div><dt>SERVER TIME</dt><dd id="broadcastServerTime">—</dd></div>
+      </dl>
+    </section>
+
+    <section class="workstation-grid" aria-label="Test Lab work surfaces">
+      <article class="workstation control-workstation">
+        <header>
+          <div>
+            <span class="section-label">DEVICE A // AUTHENTICATED OPERATOR</span>
+            <h2>Broadcast Control Lab</h2>
+          </div>
+          <div class="panel-actions">
+            <a href="/admin" target="_blank" rel="noopener">Sign in</a>
+            <a href="/control-lab" target="_blank" rel="noopener">Open full page</a>
+            <button id="reloadControl" type="button">Reload panel</button>
+          </div>
+        </header>
+        <p class="panel-note">The embedded surface is the existing authoritative Library → Queue → Active Run Control Lab. Authentication is not bypassed.</p>
+        <iframe id="controlFrame" src="/control-lab" title="Existing authenticated FRNN Broadcast Control Lab"></iframe>
+      </article>
+
+      <article class="workstation preview-workstation">
+        <header>
+          <div>
+            <span class="section-label">PUBLIC RECEIVER PREVIEW</span>
+            <h2>Broadcast</h2>
+          </div>
+          <div class="panel-actions">
+            <a href="/broadcast" target="_blank" rel="noopener">Open full page</a>
+            <button id="reloadBroadcast" type="button">Reload preview</button>
+          </div>
+        </header>
+        <p class="panel-note">This is the real public <code>/broadcast</code> receiver and reads the same public API as the phone.</p>
+        <iframe id="broadcastFrame" src="/broadcast" title="FRNN public Broadcast preview"></iframe>
+      </article>
+    </section>
+
+    <footer class="lab-footer">
+      <strong>BAREBONES FOUNDATION LAB</strong>
+      <span>Not final Mission Control, a final player app, Media Bin, Packaging Editor, mission QR system, production hosting, or LOOP runtime.</span>
+    </footer>
+  </main>
+</body>
+</html>
