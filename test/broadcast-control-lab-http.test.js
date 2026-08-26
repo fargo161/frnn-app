@@ -4,22 +4,16 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import {
+  createOwnedTestSchema,
+  disposableDatabaseChildEnvironment,
+  dropOwnedTestSchema,
+  optionalDisposableTestDatabaseUrl,
+  scopedDisposableTestDatabaseUrl
+} from '../test-support/disposable-postgres.js';
 
 const { Pool } = pg;
-const integrationUrl = process.env.TEST_DATABASE_URL || '';
-
-function verifiedIntegrationUrl() {
-  const url = new URL(integrationUrl);
-  assert.ok(['127.0.0.1', 'localhost', '::1'].includes(url.hostname), 'integration database must be local');
-  assert.equal(url.pathname, '/frnn_integration_test', 'integration tests require the disposable database name');
-  return url;
-}
-
-function urlForSchema(base, schemaName) {
-  const url = new URL(base.toString());
-  url.searchParams.set('options', `-c search_path=${schemaName},public`);
-  return url.toString();
-}
+const integrationUrl = optionalDisposableTestDatabaseUrl();
 
 async function availablePort() {
   const server = net.createServer();
@@ -77,28 +71,30 @@ async function request(baseUrl, path, { method = 'GET', body, authenticated = tr
 test('real authenticated HTTP path projects immutable v1, future v2, refusal details, and audits', {
   skip: integrationUrl ? false : 'set TEST_DATABASE_URL to run disposable Broadcast HTTP integration'
 }, async () => {
-  const baseDatabaseUrl = verifiedIntegrationUrl();
-  const schemaName = `bcl_http_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
-  const adminPool = new Pool({ connectionString: baseDatabaseUrl.toString() });
+  const adminPool = new Pool({ connectionString: integrationUrl });
+  let schemaName;
   let child;
   let isolatedPool;
   let stdout = '';
   let stderr = '';
   try {
-    await adminPool.query(`CREATE SCHEMA ${schemaName}`);
-    const isolatedUrl = urlForSchema(baseDatabaseUrl, schemaName);
+    const admin = await adminPool.connect();
+    try {
+      schemaName = await createOwnedTestSchema(admin, integrationUrl, 'bcl_http');
+    } finally {
+      admin.release();
+    }
+    const isolatedUrl = scopedDisposableTestDatabaseUrl(integrationUrl, schemaName);
     const port = await availablePort();
     const baseUrl = `http://127.0.0.1:${port}`;
-    const childEnvironment = { ...process.env };
-    delete childEnvironment.DATABASE_URL;
-    Object.assign(childEnvironment, {
-      TEST_DATABASE_URL: isolatedUrl,
+    const childEnvironment = disposableDatabaseChildEnvironment(isolatedUrl, {
       PORT: String(port),
       HOST: '0.0.0.0',
-      NODE_ENV: 'test',
       ADMIN_KEY: 'bcl-http-test-only',
       MISSION_CONTROL_PASSPHRASE: 'bcl-passphrase-test-only'
-    });
+    }, { ...process.env, DATABASE_URL: 'postgres://owner.invalid:5432/owner_persistent' });
+    assert.equal(childEnvironment.DATABASE_URL, isolatedUrl);
+    assert.equal(childEnvironment.TEST_DATABASE_URL, isolatedUrl);
     child = spawn(process.execPath, [fileURLToPath(new URL('../scripts/start-test-lab.js', import.meta.url))], {
       cwd: fileURLToPath(new URL('..', import.meta.url)),
       env: childEnvironment,
@@ -233,7 +229,14 @@ test('real authenticated HTTP path projects immutable v1, future v2, refusal det
   } finally {
     await stopChild(child);
     if (isolatedPool) await isolatedPool.end();
-    await adminPool.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
+    if (schemaName) {
+      const admin = await adminPool.connect();
+      try {
+        await dropOwnedTestSchema(admin, integrationUrl, schemaName);
+      } finally {
+        admin.release();
+      }
+    }
     await adminPool.end();
   }
 });

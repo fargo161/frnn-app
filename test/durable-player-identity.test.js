@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import pg from 'pg';
+import {
+  createOwnedTestSchema,
+  dropOwnedTestSchema,
+  optionalDisposableTestDatabaseUrl
+} from '../test-support/disposable-postgres.js';
 import { claimQuickStartCode } from '../quick-start.js';
 import {
   ISSUE_NEXT_CANDIDATE_SQL,
@@ -309,17 +314,17 @@ test('Mission Control inventory count uses the same never-owned availability bou
   assert.match(summary, /COUNT\(\*\) FILTER/);
 });
 
-const integrationUrl = process.env.TEST_DATABASE_URL || '';
+const integrationUrl = optionalDisposableTestDatabaseUrl();
 
 test('PostgreSQL backfill and release preserve prize/audit history through credential reuse', {
   skip: integrationUrl ? false : 'set TEST_DATABASE_URL to run disposable durable-identity integration'
 }, async () => {
   const { Pool } = pg;
   const pool = new Pool({ connectionString: integrationUrl });
-  const schemaName = `frnn_identity_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  let schemaName;
   const client = await pool.connect();
   try {
-    await client.query(`CREATE SCHEMA ${schemaName}`);
+    schemaName = await createOwnedTestSchema(client, integrationUrl, 'frnn_identity');
     await client.query(`SET search_path TO ${schemaName}`);
     await client.query(`CREATE TABLE access_codes (
       code TEXT PRIMARY KEY,
@@ -420,8 +425,7 @@ test('PostgreSQL backfill and release preserve prize/audit history through crede
     assert.equal(reused.rows[0].prize_history_retained, 'true');
   } finally {
     if (!client.ended) await client.query('ROLLBACK').catch(() => {});
-    await client.query('SET search_path TO public');
-    await client.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
+    if (schemaName) await dropOwnedTestSchema(client, integrationUrl, schemaName);
     client.release();
     await pool.end();
   }

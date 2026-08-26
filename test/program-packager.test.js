@@ -48,43 +48,79 @@ async function createControlLabHarness() {
     fs.readFile(new URL('../public/admin.html', import.meta.url), 'utf8')
   ]);
   const elements = new Map();
+  const documentListeners = {};
   const document = {
+    visibilityState: 'visible',
     createElement: tagName => new FakeElement(tagName),
     getElementById: id => {
       if (!elements.has(id)) elements.set(id, new FakeElement());
       return elements.get(id);
-    }
+    },
+    addEventListener: (type, handler) => { documentListeners[type] = handler; }
+  };
+  const windowListeners = {};
+  const window = {
+    addEventListener: (type, handler) => { windowListeners[type] = handler; }
   };
   for (const id of ['authRequired', 'lab', 'cancelEdit']) document.getElementById(id).className = 'hidden';
   const calls = [];
   const responses = [];
   const fetch = async (url, options = {}) => {
     calls.push({ url, options });
-    const response = responses.shift();
-    if (!response) throw new Error(`No fake response queued for ${url}`);
+    const queuedResponse = responses.shift();
+    if (!queuedResponse) throw new Error(`No fake response queued for ${url}`);
+    const response = await queuedResponse;
     return {
       ok: response.ok ?? true,
       status: response.status ?? 200,
       json: async () => response.body ?? {}
     };
   };
+  let nextIntervalId = 1;
+  const intervals = new Map();
+  const clearedIntervals = [];
+  const setInterval = (handler, milliseconds) => {
+    const id = nextIntervalId++;
+    intervals.set(id, { handler, milliseconds });
+    return id;
+  };
+  const clearInterval = id => {
+    clearedIntervals.push(id);
+    intervals.delete(id);
+  };
   const exposed = script.replace(/initialize\(\);\s*$/, '') + `
 globalThis.__controlLab = {
   initialize,loadState,saveLibraryItem,beginEdit,addToQueue,moveQueueEntry,
   removeUpcoming,deleteLibraryItem,startBroadcastNow,stopBroadcastNow,runAction,describeError,
+  reconcileAutomatically,startAutoReconciliation,stopAutoReconciliation,
   getState:()=>controlState,
+  getAutoReconcileState:()=>({timer:autoReconcileTimer,inFlight:autoReconcileInFlight,
+    intervalMs:AUTO_RECONCILE_INTERVAL_MS,pageActive,authenticatedOperator}),
   elements:{sessionState,authRequired,lab,nowStatus,nowDetails,message,libraryForm,
     itemIdInput,itemTitleInput,itemKindSelect,playbackTypeSelect,mediaRefInput,
     durationMsInput,loopEligibleInput,libraryList,queueSelect,queueList,
     startBroadcastButton,stopBroadcastButton}
 };`;
   const context = {
-    document, fetch, console, Date, JSON, Number, String, Boolean, Promise, Set,
+    document, window, fetch, setInterval, clearInterval, console, Date, JSON, Number, String, Boolean, Promise, Set,
     encodeURIComponent, globalThis: null
   };
   context.globalThis = context;
   vm.runInNewContext(exposed, context, { filename: 'public/control-lab.js' });
-  return { lab: context.__controlLab, calls, responses, html, admin };
+  return {
+    lab: context.__controlLab, calls, responses, html, admin, document,
+    documentListeners, windowListeners, intervals, clearedIntervals
+  };
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }
 
 const libraryV1 = {
@@ -103,6 +139,14 @@ const activeV1 = {
   source_queue_entry_id: 10, source_queue_position: 1, title: 'News v1',
   item_kind: 'PROGRAM', playback_type: 'test_card', media_ref: null,
   duration_ms: 12000, started_at: '2026-08-24T12:00:02.000Z'
+};
+const libraryB = { ...libraryV1, id: 'bulletin', title: 'Bulletin', duration_ms: 8000 };
+const entryB = {
+  ...entryOne, id: 11, packaged_item_id: 'bulletin', definition: libraryB
+};
+const activeB = {
+  ...activeV1, run_id: 31, packaged_item_id: 'bulletin', source_queue_entry_id: 11,
+  title: 'Bulletin', duration_ms: 8000, started_at: '2026-08-24T12:00:14.000Z'
 };
 
 function state({ library = [], queue = [], activeRun = null } = {}) {
@@ -134,6 +178,110 @@ test('Control Lab exposes auth expiry as a sign-in path instead of fake producer
   assert.equal(lab.elements.authRequired.classList.contains('hidden'), false);
   assert.equal(lab.elements.lab.classList.contains('hidden'), true);
   assert.equal(lab.elements.sessionState.textContent, 'NOT AUTHENTICATED');
+});
+
+test('Control Lab automatically reconciles one exhausted item to OFF AIR without producer mutation', async () => {
+  const { lab, responses, calls, intervals } = await createControlLabHarness();
+  responses.push(
+    { body: { authenticated: true, operator: 'DIRECTOR' } },
+    { body: state({ library: [libraryV1], activeRun: activeV1 }) }
+  );
+  await lab.initialize();
+
+  assert.equal(intervals.size, 1);
+  assert.equal([...intervals.values()][0].milliseconds, 3000);
+  assert.equal(lab.elements.nowStatus.textContent, 'ON AIR');
+
+  responses.push({ body: state({ library: [libraryV1] }) });
+  await lab.reconcileAutomatically();
+
+  assert.equal(lab.elements.nowStatus.textContent, 'OFF AIR');
+  assert.equal(lab.getState().active_run, null);
+  assert.equal(lab.getState().queue.length, 0);
+  assert.equal(lab.elements.queueList.children[0].textContent, 'Upcoming Queue is empty.');
+  assert.deepEqual(calls.slice(2).map(call => [call.url, call.options.method || 'GET']), [
+    ['/api/admin/broadcast/control-lab', 'GET']
+  ]);
+});
+
+test('Control Lab automatically renders A to B to OFF AIR as authoritative queue boundaries advance', async () => {
+  const { lab, responses, calls } = await createControlLabHarness();
+  responses.push(
+    { body: { authenticated: true, operator: 'DIRECTOR' } },
+    { body: state({ library: [libraryV1, libraryB], queue: [entryB], activeRun: activeV1 }) }
+  );
+  await lab.initialize();
+  assert.equal(lab.getState().active_run.packaged_item_id, 'news');
+  assert.deepEqual(lab.getState().queue.map(entry => entry.packaged_item_id), ['bulletin']);
+
+  responses.push({ body: state({ library: [libraryV1, libraryB], activeRun: activeB }) });
+  await lab.reconcileAutomatically();
+  assert.equal(lab.getState().active_run.packaged_item_id, 'bulletin');
+  assert.equal(lab.getState().queue.length, 0);
+  assert.equal(lab.elements.nowStatus.textContent, 'ON AIR');
+
+  responses.push({ body: state({ library: [libraryV1, libraryB] }) });
+  await lab.reconcileAutomatically();
+  assert.equal(lab.getState().active_run, null);
+  assert.equal(lab.elements.nowStatus.textContent, 'OFF AIR');
+  assert.equal(lab.getState().queue.length, 0);
+  assert.deepEqual(calls.slice(2).map(call => call.options.method || 'GET'), ['GET', 'GET']);
+});
+
+test('Control Lab serializes automatic reads and rejects an older response after a newer state load', async () => {
+  const { lab, responses, calls } = await createControlLabHarness();
+  responses.push(
+    { body: { authenticated: true, operator: 'DIRECTOR' } },
+    { body: state({ library: [libraryV1], activeRun: activeV1 }) }
+  );
+  await lab.initialize();
+
+  const pendingPoll = deferred();
+  responses.push(pendingPoll.promise);
+  const firstPoll = lab.reconcileAutomatically();
+  await lab.reconcileAutomatically();
+  assert.equal(calls.length, 3);
+
+  const newerLoad = deferred();
+  responses.push(newerLoad.promise);
+  const laterState = lab.loadState();
+  newerLoad.resolve({ body: state({ library: [libraryV1, libraryB], activeRun: activeB }) });
+  await laterState;
+  assert.equal(lab.getState().active_run.packaged_item_id, 'bulletin');
+
+  pendingPoll.resolve({ body: state({ library: [libraryV1], activeRun: activeV1 }) });
+  await firstPoll;
+  assert.equal(lab.getState().active_run.packaged_item_id, 'bulletin');
+  assert.equal(calls.length, 4);
+});
+
+test('Control Lab disposes automatic reconciliation on page exit and on session expiry', async () => {
+  const pageHarness = await createControlLabHarness();
+  pageHarness.responses.push(
+    { body: { authenticated: true, operator: 'DIRECTOR' } },
+    { body: state() }
+  );
+  await pageHarness.lab.initialize();
+  const timerId = pageHarness.lab.getAutoReconcileState().timer;
+  pageHarness.windowListeners.pagehide();
+  assert.equal(pageHarness.intervals.size, 0);
+  assert.deepEqual(pageHarness.clearedIntervals, [timerId]);
+  assert.equal(pageHarness.lab.getAutoReconcileState().pageActive, false);
+  await pageHarness.lab.reconcileAutomatically();
+  assert.equal(pageHarness.calls.length, 2);
+
+  const authHarness = await createControlLabHarness();
+  authHarness.responses.push(
+    { body: { authenticated: true, operator: 'DIRECTOR' } },
+    { body: state() }
+  );
+  await authHarness.lab.initialize();
+  authHarness.responses.push({ ok: false, status: 401, body: { error: 'MISSION_CONTROL_ACCESS_REQUIRED' } });
+  await authHarness.lab.reconcileAutomatically();
+  assert.equal(authHarness.lab.getAutoReconcileState().timer, null);
+  assert.equal(authHarness.lab.getAutoReconcileState().authenticatedOperator, '');
+  assert.equal(authHarness.lab.elements.authRequired.classList.contains('hidden'), false);
+  assert.equal(authHarness.lab.elements.sessionState.textContent, 'NOT AUTHENTICATED');
 });
 
 test('real Control Lab client performs create to duplicate queue to start to v2 edit and refusal feedback', async () => {

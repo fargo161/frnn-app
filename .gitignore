@@ -3,6 +3,7 @@ node_modules/
 .env.*
 !.env.example
 !.env.test-lab.example
+!.env.test.local.example
 npm-debug.log*
 qr/*.png
 qr/*.svg

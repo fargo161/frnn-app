@@ -9,6 +9,7 @@
     "test-lab": "node scripts/start-test-lab.js",
     "dev": "node --watch server.js",
     "test": "node --test",
+    "test:database": "node --env-file=.env.test.local --test",
     "qr": "node scripts/generate-qr.js",
     "codes:import": "node scripts/import-codes.js",
     "codes:generate": "node scripts/generate-codes.js"

@@ -196,6 +196,16 @@ npm start
 
 `PUBLIC_BASE_URL` is required for authoritative QR destinations in deployed/print workflows. R2 variables are required only when using `media-storage.js`; see [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md). Do not point tests at production PostgreSQL.
 
+### Automated tests and PostgreSQL
+
+`npm test` runs the ordinary suite and intentionally skips PostgreSQL-dependent cases when `TEST_DATABASE_URL` is absent. For the database-loaded suite, copy `.env.test.local.example` to ignored `.env.test.local`, point it only at the dedicated local `frnn_integration_test` database, and run:
+
+```bash
+npm run test:database
+```
+
+`.env.test-lab` is persistent owner Web Test Lab configuration and is never an automated-test fallback. Under `NODE_ENV=test`, FRNN uses only `TEST_DATABASE_URL`; a conflicting `DATABASE_URL` is ignored, and a missing or unapproved disposable target causes refusal or an explicit test skip before database mutation. PostgreSQL tests verify the connected loopback database, create a unique owned schema, and verify that schema's removal.
+
 ### Local Broadcast Control Lab walkthrough
 
 Run `npm run test-lab`, open the exact `/test-lab` URL printed in the terminal, sign in through the existing Mission Control path, and use the embedded `/control-lab` Library → Queue → Active Run flow. The same hub displays and previews the public `/broadcast` receiver plus a same-Wi-Fi phone URL/QR when a private LAN address is discoverable. See the [owner guide](docs/broadcast-control-lab/WEB_TEST_LAB.md) for the exact smoke test and limits.

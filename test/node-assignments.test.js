@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import pg from 'pg';
+import {
+  createOwnedTestSchema,
+  dropOwnedTestSchema,
+  optionalDisposableTestDatabaseUrl
+} from '../test-support/disposable-postgres.js';
 import { resolveNodeAssignment } from '../node-assignments.js';
 import { QR_DESTINATIONS } from '../qr-routing.js';
 
@@ -183,17 +188,17 @@ test('resolver integration remains Escape-only while six QR destinations and UI 
   assert.match(station, /startEnd\?'\/api\/start-end':`\/api\/scan\/\$\{station\}`/);
 });
 
-const integrationUrl = process.env.TEST_DATABASE_URL || '';
+const integrationUrl = optionalDisposableTestDatabaseUrl();
 
 test('PostgreSQL enforces typed bounds and resolver precedence without writes', {
   skip: integrationUrl ? false : 'set TEST_DATABASE_URL to run disposable node-assignment integration'
 }, async () => {
   const { Pool } = pg;
   const pool = new Pool({ connectionString: integrationUrl });
-  const schemaName = `frnn_assignments_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  let schemaName;
   const client = await pool.connect();
   try {
-    await client.query(`CREATE SCHEMA ${schemaName}`);
+    schemaName = await createOwnedTestSchema(client, integrationUrl, 'frnn_assignments');
     await client.query(`SET search_path TO ${schemaName}`);
     await client.query(`CREATE TABLE access_codes (code TEXT PRIMARY KEY)`);
     await client.query(`CREATE TABLE players (
@@ -249,8 +254,7 @@ test('PostgreSQL enforces typed bounds and resolver precedence without writes', 
       error => error.code === '23514' && error.constraint === 'node_assignments_assigned_message_check'
     );
   } finally {
-    await client.query('SET search_path TO public');
-    await client.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
+    if (schemaName) await dropOwnedTestSchema(client, integrationUrl, schemaName);
     client.release();
     await pool.end();
   }

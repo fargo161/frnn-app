@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import pg from 'pg';
 import {
+  createOwnedTestSchema,
+  dropOwnedTestSchema,
+  optionalDisposableTestDatabaseUrl
+} from '../test-support/disposable-postgres.js';
+import {
   DEFAULT_EVENT_ID,
   DEFAULT_EVENT_SLUG,
   safeThemeTokens,
@@ -168,17 +173,17 @@ test('stable quest routes and final transition behavior remain unchanged', async
   assert.doesNotMatch(station, /automaticFinalTransition|\/player|PLAYER HOME/);
 });
 
-const integrationUrl = process.env.TEST_DATABASE_URL || '';
+const integrationUrl = optionalDisposableTestDatabaseUrl();
 
 test('PostgreSQL migration backfills legacy rows idempotently and serializes duplicate normalized names', {
   skip: integrationUrl ? false : 'set TEST_DATABASE_URL to run disposable PostgreSQL integration'
 }, async () => {
   const { Pool } = pg;
   const pool = new Pool({ connectionString: integrationUrl });
-  const schemaName = `frnn_test_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  let schemaName;
   const client = await pool.connect();
   try {
-    await client.query(`CREATE SCHEMA ${schemaName}`);
+    schemaName = await createOwnedTestSchema(client, integrationUrl, 'frnn_test');
     await client.query(`SET search_path TO ${schemaName}`);
     await client.query(await read('../schema.sql'));
     await client.query("INSERT INTO access_codes(code,status) VALUES('AAA111','active'),('BBB222','active')");
@@ -206,8 +211,7 @@ test('PostgreSQL migration backfills legacy rows idempotently and serializes dup
       secondClient.release();
     }
   } finally {
-    await client.query('SET search_path TO public');
-    await client.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
+    if (schemaName) await dropOwnedTestSchema(client, integrationUrl, schemaName);
     client.release();
     await pool.end();
   }

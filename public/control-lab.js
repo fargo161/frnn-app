@@ -26,6 +26,12 @@ const queueList = byId('queueList');
 let controlState = { status: 'off_air', active_run: null, library: [], queue: [] };
 let editingItemId = null;
 let busy = false;
+const AUTO_RECONCILE_INTERVAL_MS = 3000;
+let stateRequestSequence = 0;
+let autoReconcileTimer = null;
+let autoReconcileInFlight = false;
+let authenticatedOperator = '';
+let pageActive = true;
 
 class ControlLabRequestError extends Error {
   constructor(code, status, details) {
@@ -70,6 +76,8 @@ function setMessage(text = '', type = '') {
 }
 
 function showAuthRequired() {
+  authenticatedOperator = '';
+  stopAutoReconciliation();
   sessionState.textContent = 'NOT AUTHENTICATED';
   authRequired.classList.remove('hidden');
   lab.classList.add('hidden');
@@ -225,14 +233,62 @@ function renderState() {
 }
 
 async function loadState() {
-  controlState = await api('/api/admin/broadcast/control-lab');
+  const requestSequence = ++stateRequestSequence;
+  const nextState = await api('/api/admin/broadcast/control-lab');
+  if (requestSequence !== stateRequestSequence || !pageActive) return controlState;
+  controlState = nextState;
   renderState();
   return controlState;
+}
+
+function stopAutoReconciliation() {
+  if (autoReconcileTimer !== null) {
+    clearInterval(autoReconcileTimer);
+    autoReconcileTimer = null;
+  }
+  stateRequestSequence += 1;
+}
+
+async function reconcileAutomatically() {
+  if (
+    busy ||
+    autoReconcileInFlight ||
+    !authenticatedOperator ||
+    !pageActive ||
+    document.visibilityState === 'hidden'
+  ) return;
+  autoReconcileInFlight = true;
+  try {
+    await loadState();
+    sessionState.textContent = `AUTHENTICATED // ${authenticatedOperator}`;
+  } catch (error) {
+    if (error.status === 401) {
+      showAuthRequired();
+      setMessage(describeError(error), 'error');
+    } else {
+      sessionState.textContent = 'AUTOMATIC REFRESH UNAVAILABLE // LAST KNOWN STATE SHOWN';
+    }
+  } finally {
+    autoReconcileInFlight = false;
+  }
+}
+
+function startAutoReconciliation() {
+  if (
+    autoReconcileTimer !== null ||
+    !authenticatedOperator ||
+    !pageActive ||
+    document.visibilityState === 'hidden'
+  ) return;
+  autoReconcileTimer = setInterval(() => {
+    void reconcileAutomatically();
+  }, AUTO_RECONCILE_INTERVAL_MS);
 }
 
 async function runAction(action, successMessage) {
   if (busy) return;
   busy = true;
+  stateRequestSequence += 1;
   setMessage('Working…');
   renderState();
   try {
@@ -336,10 +392,12 @@ async function stopBroadcastNow() {
 async function initialize() {
   try {
     const session = await api('/api/mission-control/session');
-    sessionState.textContent = `AUTHENTICATED // ${session.operator}`;
+    authenticatedOperator = session.operator;
+    sessionState.textContent = `AUTHENTICATED // ${authenticatedOperator}`;
     authRequired.classList.add('hidden');
     lab.classList.remove('hidden');
     await loadState();
+    startAutoReconciliation();
   } catch (error) {
     if (error.status === 401) return showAuthRequired();
     sessionState.textContent = 'CONTROL LAB UNAVAILABLE';
@@ -355,5 +413,23 @@ addQueueButton.addEventListener('click', () => addToQueue());
 refreshStateButton.addEventListener('click', () => runAction(async () => {}, 'Authoritative state refreshed.'));
 startBroadcastButton.addEventListener('click', startBroadcastNow);
 stopBroadcastButton.addEventListener('click', stopBroadcastNow);
+document.addEventListener('visibilitychange', () => {
+  pageActive = document.visibilityState !== 'hidden';
+  if (!pageActive) {
+    stopAutoReconciliation();
+    return;
+  }
+  startAutoReconciliation();
+  void reconcileAutomatically();
+});
+window.addEventListener('pagehide', () => {
+  pageActive = false;
+  stopAutoReconciliation();
+});
+window.addEventListener('pageshow', () => {
+  pageActive = true;
+  startAutoReconciliation();
+  void reconcileAutomatically();
+});
 
 initialize();

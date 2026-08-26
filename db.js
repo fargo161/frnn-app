@@ -2,6 +2,7 @@ import pg from 'pg';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { requireDatabaseUrlForEnvironment } from './database-config.js';
 
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -11,8 +12,7 @@ const ssl = String(process.env.PGSSL || '').toLowerCase() === 'true'
   : undefined;
 
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL ||
-    (process.env.NODE_ENV === 'test' ? process.env.TEST_DATABASE_URL : undefined),
+  connectionString: requireDatabaseUrlForEnvironment(),
   ssl,
   max: Number(process.env.PG_POOL_MAX || 12),
   idleTimeoutMillis: 30000,

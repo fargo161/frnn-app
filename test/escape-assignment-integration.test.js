@@ -5,9 +5,16 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import {
+  createOwnedTestSchema,
+  disposableDatabaseChildEnvironment,
+  dropOwnedTestSchema,
+  optionalDisposableTestDatabaseUrl,
+  scopedDisposableTestDatabaseUrl
+} from '../test-support/disposable-postgres.js';
 
 const read = relative => fs.readFile(new URL(relative, import.meta.url), 'utf8');
-const integrationUrl = process.env.TEST_DATABASE_URL || '';
+const integrationUrl = optionalDisposableTestDatabaseUrl();
 
 async function availablePort() {
   const server = net.createServer();
@@ -18,12 +25,6 @@ async function availablePort() {
   const { port } = server.address();
   await new Promise(resolve => server.close(resolve));
   return port;
-}
-
-function urlForSchema(connectionString, schemaName) {
-  const url = new URL(connectionString);
-  url.searchParams.set('options', `-c search_path=${schemaName}`);
-  return url.toString();
 }
 
 async function waitForHealth(baseUrl, child, output) {
@@ -96,7 +97,7 @@ test('real Escape endpoint branches by assignment before visit mutation and leav
 }, async () => {
   const { Pool } = pg;
   const adminPool = new Pool({ connectionString: integrationUrl });
-  const schemaName = `frnn_escape_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  let schemaName;
   const admin = await adminPool.connect();
   let child;
   let isolatedPool;
@@ -104,19 +105,16 @@ test('real Escape endpoint branches by assignment before visit mutation and leav
   let stdout = '';
 
   try {
-    await admin.query(`CREATE SCHEMA ${schemaName}`);
-    const isolatedUrl = urlForSchema(integrationUrl, schemaName);
+    schemaName = await createOwnedTestSchema(admin, integrationUrl, 'frnn_escape');
+    const isolatedUrl = scopedDisposableTestDatabaseUrl(integrationUrl, schemaName, { includePublic: false });
     const port = await availablePort();
     const baseUrl = `http://127.0.0.1:${port}`;
     child = spawn(process.execPath, [fileURLToPath(new URL('../server.js', import.meta.url))], {
       cwd: fileURLToPath(new URL('..', import.meta.url)),
-      env: {
-        ...process.env,
-        DATABASE_URL: isolatedUrl,
+      env: disposableDatabaseChildEnvironment(isolatedUrl, {
         PORT: String(port),
-        NODE_ENV: 'test',
         ADMIN_KEY: 'escape-integration-test-only'
-      },
+      }, { ...process.env, DATABASE_URL: 'postgres://owner.invalid:5432/owner_persistent' }),
       stdio: ['ignore', 'pipe', 'pipe']
     });
     child.stdout.on('data', chunk => { stdout += chunk; });
@@ -223,8 +221,7 @@ test('real Escape endpoint branches by assignment before visit mutation and leav
   } finally {
     await stopChild(child);
     if (isolatedPool) await isolatedPool.end();
-    await admin.query('SET search_path TO public');
-    await admin.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
+    if (schemaName) await dropOwnedTestSchema(admin, integrationUrl, schemaName);
     admin.release();
     await adminPool.end();
   }

@@ -98,6 +98,10 @@ import {
   testLabReadyMessage,
   testLabStartupFailure
 } from './web-test-lab-config.js';
+import {
+  databaseUrlForEnvironment,
+  databaseVariableForEnvironment
+} from './database-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -115,8 +119,8 @@ const TEST_LAB_URLS = TEST_LAB_ENABLED
 const COOKIE_NAME = 'artpark_field_access';
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-if (!process.env.DATABASE_URL && !(process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL)) {
-  console.error('DATABASE_URL is required. See .env.example.');
+if (!databaseUrlForEnvironment()) {
+  console.error(`${databaseVariableForEnvironment()} is required for NODE_ENV=${process.env.NODE_ENV || 'development'}.`);
   process.exit(1);
 }
 if (!ADMIN_KEY) {

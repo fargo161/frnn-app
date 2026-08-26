@@ -218,7 +218,18 @@ Application variables currently supported:
 - `MISSION_CONTROL_PASSPHRASE`
 - `PUBLIC_BASE_URL`
 
-Media-storage variables are listed in the Render/R2 sections. `TEST_DATABASE_URL` is test-only and must point only to a disposable PostgreSQL database because the integration test creates and drops its own temporary schema.
+Media-storage variables are listed in the Render/R2 sections.
+
+### Owner Test Lab versus automated PostgreSQL tests
+
+- `.env.test-lab` supplies the persistent owner Web Test Lab `DATABASE_URL`. `npm run test-lab` applies normal migrations and retains Library, Queue, Active Run, and other owner data between sessions.
+- `.env.test.local` supplies only `TEST_DATABASE_URL` for automated PostgreSQL tests. It must target a dedicated loopback database named `frnn_integration_test`; tests may create and drop unique temporary schemas there.
+- `npm test` does not load `.env.test.local` and truthfully skips PostgreSQL-dependent cases when disposable configuration is absent.
+- `npm run test:database` loads `.env.test.local` and runs the database-backed suite.
+
+When `NODE_ENV=test`, application database selection uses only `TEST_DATABASE_URL`. It never falls back to an inherited owner `DATABASE_URL` or to `.env.test-lab`. Shared test safeguards verify both the configured URL and the connected PostgreSQL runtime identity before creating a schema, give child servers the same schema-scoped test URL under both recognized variable names, and drop only schemas registered as owned by that test process. If disposable configuration is missing or fails the guard, database mutation must not begin.
+
+Never point automated destructive tests at the persistent Test Lab, Docker Compose `artpark`, staging, or production database. A temporary schema name alone does not make its containing database disposable.
 
 ## Separation from the agent-team repository
 

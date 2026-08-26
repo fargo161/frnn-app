@@ -20,9 +20,15 @@ import {
   reorderQueueEntries,
   removeQueueEntry
 } from '../broadcast-control-lab.js';
+import {
+  createOwnedTestSchema,
+  dropOwnedTestSchema,
+  optionalDisposableTestDatabaseUrl,
+  scopedDisposableTestDatabaseUrl
+} from '../test-support/disposable-postgres.js';
 
 const { Pool } = pg;
-const integrationUrl = process.env.TEST_DATABASE_URL || '';
+const integrationUrl = optionalDisposableTestDatabaseUrl();
 const schemaSql = await fs.readFile(new URL('../schema.sql', import.meta.url), 'utf8');
 const migrationsDirectory = new URL('../migrations/', import.meta.url);
 
@@ -46,39 +52,32 @@ const transition = Object.freeze({
   loop_eligible: false
 });
 
-function integrationOptions() {
-  if (!integrationUrl) return null;
-  const url = new URL(integrationUrl);
-  assert.ok(['127.0.0.1', 'localhost', '::1'].includes(url.hostname), 'integration database must be local');
-  assert.equal(url.pathname, '/frnn_integration_test', 'integration tests require the disposable database name');
-  return url;
-}
-
-function schemaName(prefix) {
-  return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
-}
-
-function scopedUrl(base, schema) {
-  const url = new URL(base.toString());
-  url.searchParams.set('options', `-c search_path=${schema},public`);
-  return url.toString();
-}
-
 async function createDisposableSchema(prefix) {
-  const base = integrationOptions();
-  const schema = schemaName(prefix);
-  const admin = new Pool({ connectionString: base.toString() });
-  await admin.query(`CREATE SCHEMA ${schema}`);
-  return {
-    schema,
-    admin,
-    pool: new Pool({ connectionString: scopedUrl(base, schema), max: 6 })
-  };
+  const admin = new Pool({ connectionString: integrationUrl });
+  const client = await admin.connect();
+  try {
+    const schema = await createOwnedTestSchema(client, integrationUrl, prefix);
+    client.release();
+    return {
+      schema,
+      admin,
+      pool: new Pool({ connectionString: scopedDisposableTestDatabaseUrl(integrationUrl, schema), max: 6 })
+    };
+  } catch (error) {
+    client.release();
+    await admin.end();
+    throw error;
+  }
 }
 
 async function dropDisposableSchema(context) {
   await context.pool.end();
-  await context.admin.query(`DROP SCHEMA IF EXISTS ${context.schema} CASCADE`);
+  const client = await context.admin.connect();
+  try {
+    await dropOwnedTestSchema(client, integrationUrl, context.schema);
+  } finally {
+    client.release();
+  }
   await context.admin.end();
 }
 
@@ -333,7 +332,7 @@ test('Library to Queue to immutable Active Run preserves v1 and activates v2 lat
     const immutableV2 = structuredClone(future.active_run);
 
     await activePool.end();
-    activePool = new Pool({ connectionString: scopedUrl(integrationOptions(), context.schema), max: 6 });
+    activePool = new Pool({ connectionString: scopedDisposableTestDatabaseUrl(integrationUrl, context.schema), max: 6 });
     context.pool = activePool;
     const recovered = await transaction(activePool, client => readControlLabState(client));
     assert.deepEqual(recovered.active_run, immutableV2);

@@ -6,6 +6,7 @@ import {
   DEFAULT_TEST_LAB_PORT,
   missingTestLabSettings,
   parseEnvFile,
+  shouldLoadOwnerTestLabSettings,
   testLabStartupFailure
 } from '../web-test-lab-config.js';
 
@@ -23,7 +24,7 @@ function loadSettingsFile() {
 }
 
 try {
-  const settingsLoaded = loadSettingsFile();
+  const settingsLoaded = shouldLoadOwnerTestLabSettings(process.env) && loadSettingsFile();
   process.env.FRNN_TEST_LAB = 'true';
   process.env.PORT ||= String(DEFAULT_TEST_LAB_PORT);
   process.env.HOST ||= DEFAULT_TEST_LAB_HOST;
@@ -33,6 +34,8 @@ try {
   if (missing.length) {
     const setupHint = settingsLoaded
       ? 'Add the missing values to .env.test-lab.'
+      : String(process.env.NODE_ENV || '').toLowerCase() === 'test'
+        ? 'Set TEST_DATABASE_URL to the approved disposable automated-test database.'
       : 'Copy .env.test-lab.example to .env.test-lab and fill in its settings.';
     throw new Error([
       'FRNN Test Lab did not start.',

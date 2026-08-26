@@ -27,3 +27,6 @@
 | 2026-08-24 19:32 | BCL two-receiver restart and natural-boundary rehearsal | NOT COMMITTED | [Report](2026-08-24_1932_bcl-two-receiver-restart-rehearsal.md) |
 | 2026-08-24 19:39 | Commit exact BCL Task 01 state | INCLUDED IN THIS COMMIT | [Report](2026-08-24_1939_commit-bcl-task-01.md) |
 | 2026-08-24 23:12 | First Broadcast Packager — Web Test Lab | NOT COMMITTED | [Report](2026-08-24_2312_first-broadcast-packager-web-test-lab.md) |
+| 2026-08-25 17:44 | Broadcast Control Lab automatic reconciliation | NOT COMMITTED | [Report](2026-08-25_1744_control-lab-auto-reconciliation.md) |
+| 2026-08-25 20:01 | Test database isolation audit and hardening | NOT COMMITTED | [Report](2026-08-25_2001_test-database-isolation-hardening.md) |
+| 2026-08-25 20:22 | Owner Web Test Lab stabilization checkpoint | INCLUDED IN THIS COMMIT | [Report](2026-08-25_2022_owner-web-lab-stabilization-checkpoint.md) |

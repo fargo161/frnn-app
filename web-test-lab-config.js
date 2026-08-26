@@ -1,4 +1,9 @@
 import os from 'node:os';
+import {
+  databaseUrlForEnvironment,
+  databaseVariableForEnvironment,
+  isAutomatedTestEnvironment
+} from './database-config.js';
 
 export const DEFAULT_TEST_LAB_PORT = 3000;
 export const DEFAULT_TEST_LAB_HOST = '0.0.0.0';
@@ -98,15 +103,15 @@ export function parseEnvFile(source) {
 }
 
 export function missingTestLabSettings(environment = process.env) {
-  const databaseConfigured = Boolean(
-    environment.DATABASE_URL ||
-    (environment.NODE_ENV === 'test' && environment.TEST_DATABASE_URL)
-  );
   return [
-    ...(!databaseConfigured ? ['DATABASE_URL'] : []),
+    ...(!databaseUrlForEnvironment(environment) ? [databaseVariableForEnvironment(environment)] : []),
     ...(!environment.ADMIN_KEY ? ['ADMIN_KEY'] : []),
     ...(!environment.MISSION_CONTROL_PASSPHRASE ? ['MISSION_CONTROL_PASSPHRASE'] : [])
   ];
+}
+
+export function shouldLoadOwnerTestLabSettings(environment = process.env) {
+  return !isAutomatedTestEnvironment(environment);
 }
 
 function technicalDetail(error) {

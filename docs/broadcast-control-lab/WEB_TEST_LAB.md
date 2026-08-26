@@ -87,6 +87,8 @@ Library, Queue, Active Run, Mission Control sessions, and other FRNN state use t
 
 Startup applies missing migrations but does not erase or recreate ordinary Test Lab data. Do not point `.env.test-lab` at the disposable `frnn_integration_test` database used by automated tests.
 
+`.env.test-lab` and `.env.test.local` have opposite purposes. The first is persistent owner data for `npm run test-lab`; the second is ignored disposable configuration for `npm run test:database`. Automated tests never load `.env.test-lab` as a fallback. If their approved `TEST_DATABASE_URL` is unavailable, they skip or refuse to start rather than substituting this persistent database.
+
 ## Likely troubleshooting
 
 - **PostgreSQL is unavailable:** start Docker Desktop and run `docker compose up db -d`, or correct `DATABASE_URL`. The Test Lab will not claim READY until it can migrate and read the database.
